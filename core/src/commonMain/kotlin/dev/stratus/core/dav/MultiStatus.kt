@@ -23,6 +23,8 @@ import nl.adaptivity.xmlutil.xmlStreaming
  */
 internal object MultiStatus {
     private const val DAV = "DAV:"
+    // The server's namespace, an identifier rather than a link: it kept the
+    // repository's first address when the repos moved to stratus-private-cloud.
     private const val STRATUS = "https://github.com/C0piIot/stratus"
 
     fun parse(xml: String, basePath: String): List<DavResource> =

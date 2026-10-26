@@ -389,5 +389,5 @@ MIT. See [LICENSE](LICENSE).
 
 ## Related
 
-- Workspace and shared principles: https://github.com/stratus-private-cloud/stratus
+- Workspace and shared principles: https://github.com/stratus-private-cloud/.github
 - Server: https://github.com/stratus-private-cloud/stratus-backend

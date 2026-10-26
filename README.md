@@ -14,7 +14,7 @@ private to Stratus.
 > background. **On iOS it now backs up too**: the camera roll goes out through a
 > background transfer that the system finishes while the app is closed, and
 > which has never been run by anybody on a real phone — see
-> [#117](https://github.com/C0piIot/stratus-app/issues/117). The sections below
+> [#117](https://github.com/stratus-private-cloud/stratus-app/issues/117). The sections below
 > describe what it is meant to be; this warning shrinks as that stops being
 > aspirational.
 
@@ -344,13 +344,13 @@ fork that wants the lines changes it.
 
 One address, which never changes and needs no account:
 
-**https://github.com/C0piIot/stratus-app/releases/download/latest/stratus.apk**
+**https://github.com/stratus-private-cloud/stratus-app/releases/download/latest/stratus.apk**
 
 It is the current state of `main`, rebuilt and replaced on every push. Open it on
 the phone and install, or `adb install stratus.apk`.
 
 Every CI run, on a branch or not, also attaches the APK to itself under
-[Actions](https://github.com/C0piIot/stratus-app/actions) — useful for trying a
+[Actions](https://github.com/stratus-private-cloud/stratus-app/actions) — useful for trying a
 change before it lands, though GitHub serves artifacts as a zip and only to
 somebody signed in.
 
@@ -389,5 +389,5 @@ MIT. See [LICENSE](LICENSE).
 
 ## Related
 
-- Workspace and shared principles: https://github.com/C0piIot/stratus
-- Server: https://github.com/C0piIot/stratus-backend
+- Workspace and shared principles: https://github.com/stratus-private-cloud/stratus
+- Server: https://github.com/stratus-private-cloud/stratus-backend

@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
@@ -168,6 +170,19 @@ tasks.withType<AbstractTestTask>().configureEach {
         showStackTraces = true
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
+}
+
+// A hang has to name its test (stratus-app#169). runTest's own timeout cannot
+// interrupt a thread blocked on a socket or a lock, which is how CI once sat
+// thirteen minutes in here with nothing to say; JUnit's, run on a thread of its
+// own, can. Three minutes so the conformance tests' runTest(2.minutes) still
+// fails first with its own message. And the task gives up before the job's
+// fifteen, so Gradle writes its report instead of being cancelled with it.
+tasks.named<Test>("jvmTest") {
+    useJUnitPlatform()
+    systemProperty("junit.jupiter.execution.timeout.default", "3m")
+    systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SEPARATE_THREAD")
+    timeout.set(Duration.ofMinutes(10))
 }
 
 // Where the simulator's TLS test finds its server.

@@ -43,7 +43,25 @@ class BrowserController(
 
     private var running: Job? = null
 
-    fun start() = go(mutable.value.path)
+    /**
+     * Lists where the browser is, except that a Stratus rooted at its origin
+     * opens on `files/`: the origin there is a list of generated collections,
+     * and the tree somebody came for is one level down.
+     *
+     * Asked once, and a server that cannot be asked is not a Stratus: the
+     * listing that follows is what reports it unreachable.
+     */
+    fun start() {
+        running?.cancel()
+        mutable.value = mutable.value.copy(busy = true, failure = null, pending = null)
+        running = scope.launch {
+            var path = mutable.value.path
+            if (path == "/" && dav.isStratusAtOrigin()) path = STRATUS_HOME
+            mutable.value = mutable.value.copy(path = path)
+            load(path)
+        }
+    }
+
 
     fun enter(directory: DavResource) = go(directory.path)
 
@@ -60,19 +78,21 @@ class BrowserController(
     private fun go(path: String) {
         running?.cancel()
         mutable.value = mutable.value.copy(path = path, busy = true, failure = null, pending = null)
-        running = scope.launch {
-            try {
-                mutable.value = mutable.value.copy(entries = dav.list(path).sortedForPeople(), busy = false)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: DavError) {
-                mutable.value = mutable.value.copy(busy = false, entries = emptyList(), failure = BrowserFailure.Listing(e))
-            } catch (e: Exception) {
-                // Cleared like any failed listing: the path has already moved,
-                // and the previous folder's rows under this one's name would be
-                // a listing of somewhere else.
-                mutable.value = mutable.value.copy(busy = false, entries = emptyList(), failure = unreachable(e))
-            }
+        running = scope.launch { load(path) }
+    }
+
+    private suspend fun load(path: String) {
+        try {
+            mutable.value = mutable.value.copy(entries = dav.list(path).sortedForPeople(), busy = false)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: DavError) {
+            mutable.value = mutable.value.copy(busy = false, entries = emptyList(), failure = BrowserFailure.Listing(e))
+        } catch (e: Exception) {
+            // Cleared like any failed listing: the path has already moved,
+            // and the previous folder's rows under this one's name would be
+            // a listing of somewhere else.
+            mutable.value = mutable.value.copy(busy = false, entries = emptyList(), failure = unreachable(e))
         }
     }
 
@@ -196,6 +216,23 @@ class BrowserController(
     private companion object {
         const val CHUNK_BYTES = 64L * 1024
     }
+}
+
+internal const val STRATUS_HOME = "/files/"
+
+/**
+ * Whether this is a Stratus and the app is pointed at its origin. Pointed
+ * anywhere below that, somebody chose where to be, and it is respected.
+ *
+ * A server that cannot be asked is not a Stratus: whatever is shown next is
+ * what reports it unreachable.
+ */
+suspend fun DavClient.isStratusAtOrigin(): Boolean = basePath.isEmpty() && try {
+    stratusVersion() != null
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Exception) {
+    false
 }
 
 /**

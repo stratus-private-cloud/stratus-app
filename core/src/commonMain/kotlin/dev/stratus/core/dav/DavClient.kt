@@ -25,7 +25,8 @@ import kotlinx.io.RawSource
  * Nothing here is specific to Stratus, and that is a constraint rather than an
  * accident: the app has to work against any WebDAV server, so a feature that
  * would be easier with a private endpoint is a conversation and not a commit.
- * See CLAUDE.md.
+ * See CLAUDE.md. [stratusVersion] says whether a Stratus answered; what the
+ * app does with that is decided above this class.
  *
  * [baseUrl] is the collection the app is rooted at, such as
  * `http://host:8080/dav/`. Every [path] below is relative to it and given
@@ -91,6 +92,17 @@ class DavClient(
         // A server may list several grammars in the header, or send the header
         // several times; ours is the only one this client can write.
         return response.headers.getAll(DASL).orEmpty().any { it.contains(GRAMMAR) }
+    }
+
+    /**
+     * The version of the Stratus answering, from one `OPTIONS` at the root, or
+     * null when it is not one. `Stratus-Version` first, because a reverse
+     * proxy -- Fly's, or nginx by default -- rewrites or drops `Server`.
+     */
+    suspend fun stratusVersion(): String? {
+        val headers = http.request(url("/", collection = true)) { method = HttpMethod.Options }.headers
+        return headers[STRATUS_VERSION]
+            ?: headers[HttpHeaders.Server]?.takeIf { it.startsWith("Stratus/") }?.removePrefix("Stratus/")
     }
 
     /**
@@ -253,6 +265,7 @@ class DavClient(
 
         /** The one grammar RFC 5323 requires of a server that has the method. */
         const val GRAMMAR = "DAV:basicsearch"
+        const val STRATUS_VERSION = "Stratus-Version"
 
         /**
          * How many results to ask for. A search is read rather than scrolled,

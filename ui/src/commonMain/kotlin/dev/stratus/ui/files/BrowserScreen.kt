@@ -3,6 +3,17 @@ package dev.stratus.ui.files
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -70,6 +81,17 @@ fun BrowserScreen(
     onEditServer: () -> Unit = {},
     /** Drawn under the bar and above everything else: the backup strip, from App. */
     banner: @Composable () -> Unit = {},
+    /** The sections of a Stratus, from App; nothing against any other server. */
+    bottomBar: @Composable () -> Unit = {},
+    /**
+     * A folder's picture where there is one -- an album's cover -- and, when
+     * this answers for the folder somebody is in, its rows are drawn as tiles.
+     */
+    cover: (suspend (DavResource) -> ImageBitmap?)? = null,
+    /** Whether the folder at this path is shown as tiles rather than rows. */
+    tiles: (String) -> Boolean = { false },
+    /** A way back out of a browser opened over another screen, such as the trash. */
+    onClose: (() -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
     // Which of two indicators a listing shows: the pulled one for a pull, the
@@ -86,6 +108,11 @@ fun BrowserScreen(
         // changes.
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    if (onClose != null) {
+                        IconButton(onClick = onClose) { Text(Glyph.BACK, style = MaterialTheme.typography.titleLarge) }
+                    }
+                },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(StratusMark, contentDescription = null, Modifier.size(22.dp))
@@ -101,10 +128,11 @@ fun BrowserScreen(
                 },
             )
         },
+        bottomBar = bottomBar,
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             banner()
-            Where(state.path, up = { controller.goUp() })
+            Where(state.path, controller.floor, up = { controller.goUp() })
             if (state.busy && !pulled) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.failure?.let {
                 Text(explain(it), Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp))
@@ -131,10 +159,22 @@ fun BrowserScreen(
                 },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(state.entries, key = { it.path }) { entry ->
-                        Entry(entry, controller, cast)
-                        HorizontalDivider()
+                if (cover != null && tiles(state.path)) {
+                    LazyVerticalGrid(
+                        GridCells.Adaptive(150.dp),
+                        Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(state.entries, key = { it.path }) { entry -> Tile(entry, controller, cover) }
+                    }
+                } else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(state.entries, key = { it.path }) { entry ->
+                            Entry(entry, controller, cast)
+                            HorizontalDivider()
+                        }
                     }
                 }
             }
@@ -157,12 +197,13 @@ fun BrowserScreen(
  * climb to, so there is no arrow -- the collections there are the top.
  */
 @Composable
-private fun Where(path: String, up: () -> Unit) {
+private fun Where(path: String, floor: String, up: () -> Unit) {
+    val top = path.trimEnd('/') == floor.trimEnd('/')
     Row(
-        Modifier.fillMaxWidth().padding(start = if (path == "/") 16.dp else 4.dp, end = 16.dp),
+        Modifier.fillMaxWidth().padding(start = if (top) 16.dp else 4.dp, end = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (path != "/") {
+        if (!top) {
             IconButton(onClick = up) {
                 Text(Glyph.BACK, style = MaterialTheme.typography.titleLarge)
             }
@@ -172,6 +213,32 @@ private fun Where(path: String, up: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * A folder as a square: its picture, or its mark where it has none, and its
+ * name under it -- the web's album grid. Tapping walks in, as a row does.
+ */
+@Composable
+private fun Tile(entry: DavResource, controller: BrowserController, cover: suspend (DavResource) -> ImageBitmap?) {
+    val picture by produceState<ImageBitmap?>(null, entry.path) { value = cover(entry) }
+    Column(
+        Modifier.clickable { if (entry.isDirectory) controller.enter(entry) else controller.openFile(entry) },
+    ) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            val shown = picture
+            if (shown != null) {
+                Image(shown, contentDescription = null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                Text(markOf(entry), style = MaterialTheme.typography.displaySmall, modifier = Modifier.clearAndSetSemantics {})
+            }
+        }
+        Text(entry.name, Modifier.padding(top = 6.dp), maxLines = 2, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

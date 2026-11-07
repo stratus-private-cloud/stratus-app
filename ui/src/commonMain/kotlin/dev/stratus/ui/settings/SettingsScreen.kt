@@ -36,6 +36,8 @@ fun SettingsScreen(
     backupSummary: String,
     onServer: () -> Unit,
     onBackup: () -> Unit,
+    /** The trash, which only a Stratus has; null elsewhere. */
+    onTrash: (() -> Unit)? = null,
     /** Whether crash reports are on, or null in a build that cannot send any. */
     reporting: Boolean?,
     onReporting: (Boolean) -> Unit,
@@ -44,6 +46,7 @@ fun SettingsScreen(
     Page("Settings", onBack = onClose) {
         NavRow(Glyph.SERVER, "Server", serverAddress, onClick = onServer)
         NavRow(Glyph.BACKUP, "Backup", backupSummary, onClick = onBackup)
+        if (onTrash != null) NavRow(Glyph.TRASH, "Trash", "What was deleted, until it is swept", onClick = onTrash)
 
         // Neither the server's nor the backup's, and the third surface this
         // app has is this menu -- so it is a row here rather than a screen

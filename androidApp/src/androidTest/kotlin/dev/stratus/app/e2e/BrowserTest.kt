@@ -81,6 +81,23 @@ class BrowserTest : E2E() {
     }
 
     @Test
+    fun whatWasDeletedIsInTheTrash() {
+        Stratus.folder("/$unique/")
+        Stratus.file("/$unique/binned-$unique.txt")
+        signedIn()
+        tap(unique)
+
+        tap("binned-$unique.txt")
+        tap("Delete")
+        tap("Delete")
+        gone("binned-$unique.txt")
+
+        openSettings()
+        tap("Trash")
+        see("binned-$unique.txt")
+    }
+
+    @Test
     fun aFolderCanBeRenamedFromItsLongPressMenu() {
         Stratus.folder("/$unique/")
         signedIn()

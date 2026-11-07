@@ -190,15 +190,13 @@ abstract class E2E {
     }
 
     /**
-     * Signed in and looking at the tree, which is one step down from where
-     * signing in lands: a Stratus answers its origin with a listing of its
-     * collections, and `files` is the writable one (stratus-backend#279).
+     * Signed in and looking at the tree, which is where signing in to a
+     * Stratus lands: its Files section, `/files/`.
      */
     fun signedIn() {
         launch()
         signIn()
         onTheBrowser()
-        tap("files")
     }
 
     /**

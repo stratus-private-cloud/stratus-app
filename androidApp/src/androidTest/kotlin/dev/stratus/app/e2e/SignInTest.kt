@@ -50,18 +50,20 @@ class SignInTest : E2E() {
         onTheBrowser()
     }
 
-    // stratus-backend#279: the origin is a collection of collections, and the
-    // tree is one of them -- so this is what signing in now lands on.
+    // A Stratus at its origin lands on its tree, with its two libraries as
+    // sections of their own rather than folders beside it.
     @Test
-    fun signingInLandsOnTheCollectionsAndTheTreeIsOneOfThem() {
+    fun signingInLandsOnTheFilesAndTheLibrariesAreSections() {
         Stratus.folder("/$unique/")
         launch()
         signIn()
-        see("files")
-        see("photos")
-        see("playlists")
+        see(unique)
 
-        tap("files")
+        tap("Music")
+        see("/music/")
+        gone(unique)
+
+        tap("Files")
         see(unique)
     }
 

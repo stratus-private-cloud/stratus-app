@@ -76,6 +76,7 @@ class BrowserControllerTest {
         links: LinkSupport = support(),
         server: String? = null,
         base: String = "http://host/",
+        floor: String = "/",
         answer: (HttpRequestData) -> Pair<HttpStatusCode, String>,
     ): BrowserController {
         val engine = MockEngine { request ->
@@ -95,6 +96,7 @@ class BrowserControllerTest {
                 sheet,
                 links,
             ) { 1_700_000_000 },
+            floor,
         )
     }
 
@@ -151,6 +153,26 @@ class BrowserControllerTest {
         val browser = BrowserController(DavClient(HttpClient(engine), "http://host/"), handoff, this)
         browser.start()
         assertEquals("/files/", browser.settled().path)
+    }
+
+    @Test
+    fun aSectionOpensOnItsFloorAndCannotClimbOutOfIt() = runTest {
+        val browser = controller(
+            this,
+            server = "Stratus/1.2.3",
+            floor = "/music/",
+            answer = listingOf("/music/Autechre" to true),
+        )
+        browser.start()
+        assertEquals("/music/", browser.settled().path)
+        // Not asked who the server is: a section only exists once that is known.
+        assertEquals(listOf("PROPFIND"), seen.map { it.method.value })
+
+        browser.enter(browser.state.value.entries.single())
+        browser.settled()
+        assertTrue(browser.goUp())
+        assertEquals("/music/", browser.settled().path)
+        assertTrue(!browser.goUp())
     }
 
     @Test

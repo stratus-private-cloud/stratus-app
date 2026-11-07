@@ -41,6 +41,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.stratus.core.cast.CastController
 import dev.stratus.core.cast.CastDevice
@@ -191,53 +194,93 @@ internal fun Entry(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
-    Box {
-        ListItem(
-            headlineContent = { Text(entry.name) },
-            supportingContent = { Text(if (entry.isDirectory) "Folder" else describe(entry)) },
-            // A folder's menu had no way of opening at all, because tapping one
-            // walks into it -- so renaming or deleting a folder was unreachable.
-            // Holding is the gesture for "not the obvious thing", everywhere.
-            modifier = Modifier.combinedClickable(
-                onClick = { if (entry.isDirectory) onEnter(entry) else menuOpen = true },
-                onLongClick = { menuOpen = true },
-            ),
-        )
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            if (!entry.isDirectory) {
-                // Two different things: one shows the file, the other keeps it.
-                DropdownMenuItem(
-                    text = { Text("Open") },
-                    onClick = { menuOpen = false; controller.openFile(entry) },
-                )
-                DropdownMenuItem(
-                    text = { Text("Download") },
-                    onClick = { menuOpen = false; controller.saveFile(entry) },
-                )
+    // The web UI's row: the kind on the left and every action behind one
+    // gear on the right. Tapping and holding the row still open the same menu,
+    // since the gear is a small target and the row is the whole width.
+    ListItem(
+        leadingContent = { Text(markOf(entry), style = MaterialTheme.typography.titleLarge) },
+        headlineContent = { Text(entry.name) },
+        supportingContent = { Text(if (entry.isDirectory) "Folder" else describe(entry)) },
+        trailingContent = {
+            // Anchored to the gear rather than the row, so the menu opens
+            // where the finger is, as the web's opens under its button.
+            Box {
+                // The gear is named by its description and not by its text:
+                // the bar's Settings is the same emoji, and that one is the
+                // button a test or a screen reader finds by "⚙️".
+                IconButton(
+                    onClick = { menuOpen = true },
+                    modifier = Modifier.semantics { contentDescription = "Actions on ${entry.name}" },
+                ) { Text(Glyph.ACTIONS, Modifier.clearAndSetSemantics {}) }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    Actions(entry, controller, cast, close = { menuOpen = false })
+                }
             }
-            if (cast?.canCast(entry) == true) {
-                DropdownMenuItem(
-                    text = { Text("Cast to a screen") },
-                    onClick = { menuOpen = false; cast.offer(entry) },
-                )
-            }
-            if (controller.canShare) {
-                DropdownMenuItem(
-                    text = { Text("Share a link") },
-                    onClick = { menuOpen = false; controller.ask(Confirmation.Share(entry)) },
-                )
-            }
-            DropdownMenuItem(
-                text = { Text("Rename") },
-                onClick = { menuOpen = false; controller.ask(Confirmation.Rename(entry)) },
-            )
-            DropdownMenuItem(
-                text = { Text("Delete") },
-                onClick = { menuOpen = false; controller.ask(Confirmation.Delete(entry)) },
-            )
-        }
+        },
+        // A folder's menu had no way of opening at all, because tapping one
+        // walks into it -- so renaming or deleting a folder was unreachable.
+        // Holding is the gesture for "not the obvious thing", everywhere.
+        modifier = Modifier.combinedClickable(
+            onClick = { if (entry.isDirectory) onEnter(entry) else menuOpen = true },
+            onLongClick = { menuOpen = true },
+        ),
+    )
+}
+
+@Composable
+private fun Actions(entry: DavResource, controller: BrowserController, cast: CastController?, close: () -> Unit) {
+    if (!entry.isDirectory) {
+        // Two different things: one shows the file, the other keeps it.
+        Action(Glyph.OPEN, "Open") { close(); controller.openFile(entry) }
+        Action(Glyph.DOWNLOAD, "Download") { close(); controller.saveFile(entry) }
+    }
+    if (cast?.canCast(entry) == true) {
+        Action(Glyph.SCREEN, "Cast to a screen") { close(); cast.offer(entry) }
+    }
+    if (controller.canShare) {
+        Action(Glyph.SHARE, "Share a link") { close(); controller.ask(Confirmation.Share(entry)) }
+    }
+    Action(Glyph.RENAME, "Rename") { close(); controller.ask(Confirmation.Rename(entry)) }
+    HorizontalDivider()
+    Action(Glyph.DELETE, "Delete", danger = true) { close(); controller.ask(Confirmation.Delete(entry)) }
+}
+
+/** A menu line: the emoji, then the words, which are what a test and a screen reader go by. */
+@Composable
+private fun Action(glyph: String, label: String, danger: Boolean = false, onClick: () -> Unit) {
+    val colour = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    DropdownMenuItem(
+        leadingIcon = { Text(glyph, Modifier.clearAndSetSemantics {}) },
+        text = { Text(label, color = colour) },
+        onClick = onClick,
+    )
+}
+
+/**
+ * What kind of thing a row is, as the web UI's listing draws it. The type the
+ * server reported first, and the name's extension where it reported none --
+ * which a generic WebDAV server often does not.
+ */
+internal fun markOf(entry: DavResource): String {
+    if (entry.isDirectory) return Glyph.FOLDER
+    val type = entry.contentType?.substringBefore(';')?.trim()?.lowercase().orEmpty()
+    val ext = entry.name.substringAfterLast('.', "").lowercase()
+    return when {
+        type.startsWith("image/") || ext in photoExtensions -> Glyph.PHOTO
+        type.startsWith("video/") || ext in filmExtensions -> Glyph.FILM
+        type.startsWith("audio/") || ext in trackExtensions -> Glyph.TRACK
+        type == "application/pdf" || ext == "pdf" -> Glyph.PDF
+        ext in setOf("zip", "tar", "gz", "tgz", "bz2", "xz", "zst", "7z", "rar") -> Glyph.ARCHIVE
+        ext in setOf("xls", "xlsx", "ods", "csv", "tsv") -> Glyph.SHEET
+        ext == "ics" -> Glyph.EVENT
+        ext == "vcf" -> Glyph.CONTACT
+        else -> Glyph.DOCUMENT
     }
 }
+
+private val photoExtensions = setOf("jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "tif", "tiff", "bmp", "dng", "avif")
+private val filmExtensions = setOf("mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "ts", "3gp")
+private val trackExtensions = setOf("mp3", "m4a", "flac", "ogg", "opus", "wav", "aac", "alac", "wma", "aiff")
 
 @Composable
 private fun DeleteDialog(target: DavResource, controller: BrowserController) {

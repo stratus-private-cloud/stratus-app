@@ -33,6 +33,25 @@ object Glyph {
     const val BUILD = "🏷️"
     const val SCREEN = "📺"
 
+    // A row's kind and what can be done to it: the web UI's listing, mark for
+    // mark, so the two read as one thing.
+    const val ACTIONS = SETTINGS
+    const val FOLDER = "📁"
+    const val PHOTO = "🖼️"
+    const val FILM = "🎬"
+    const val TRACK = "🎵"
+    const val PDF = "📕"
+    const val ARCHIVE = "📦"
+    const val SHEET = "📊"
+    const val EVENT = "📅"
+    const val CONTACT = "👤"
+    const val DOCUMENT = "📄"
+    const val OPEN = "👁️"
+    const val DOWNLOAD = "📥"
+    const val SHARE = "🔗"
+    const val RENAME = EDIT
+    const val DELETE = "🗑️"
+
     const val BACK = "←"
     const val MORE = "›"
 }

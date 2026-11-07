@@ -64,6 +64,7 @@ import dev.stratus.core.dav.DavResource
 import dev.stratus.core.files.BrowserController
 import dev.stratus.core.files.BrowserFailure
 import dev.stratus.core.files.Confirmation
+import dev.stratus.core.play.MusicController
 import dev.stratus.core.share.ShareLife
 import dev.stratus.ui.Glyph
 import dev.stratus.ui.StratusMark
@@ -92,6 +93,10 @@ fun BrowserScreen(
     tiles: (String) -> Boolean = { false },
     /** A way back out of a browser opened over another screen, such as the trash. */
     onClose: (() -> Unit)? = null,
+    /** Playing a track here, or null where this platform has no player. */
+    music: MusicController? = null,
+    /** Whether tapping a track plays it, which is what the Music section is for. */
+    playOnTap: Boolean = false,
 ) {
     val state by controller.state.collectAsState()
     // Which of two indicators a listing shows: the pulled one for a pull, the
@@ -172,7 +177,11 @@ fun BrowserScreen(
                 } else {
                     LazyColumn(Modifier.fillMaxSize()) {
                         items(state.entries, key = { it.path }) { entry ->
-                            Entry(entry, controller, cast)
+                            Entry(
+                                entry, controller, cast,
+                                onPlay = music?.takeIf { it.canPlay(entry) }?.let { m -> { m.play(state.entries, entry) } },
+                                playOnTap = playOnTap,
+                            )
                             HorizontalDivider()
                         }
                     }
@@ -258,6 +267,9 @@ internal fun Entry(
     controller: BrowserController,
     cast: CastController?,
     onEnter: (DavResource) -> Unit = controller::enter,
+    /** Plays this track and what follows it, where it is one. */
+    onPlay: (() -> Unit)? = null,
+    playOnTap: Boolean = false,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -280,7 +292,7 @@ internal fun Entry(
                     modifier = Modifier.semantics { contentDescription = "Actions on ${entry.name}" },
                 ) { Text(Glyph.ACTIONS, Modifier.clearAndSetSemantics {}) }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    Actions(entry, controller, cast, close = { menuOpen = false })
+                    Actions(entry, controller, cast, onPlay, close = { menuOpen = false })
                 }
             }
         },
@@ -288,14 +300,27 @@ internal fun Entry(
         // walks into it -- so renaming or deleting a folder was unreachable.
         // Holding is the gesture for "not the obvious thing", everywhere.
         modifier = Modifier.combinedClickable(
-            onClick = { if (entry.isDirectory) onEnter(entry) else menuOpen = true },
+            onClick = {
+                when {
+                    entry.isDirectory -> onEnter(entry)
+                    playOnTap && onPlay != null -> onPlay()
+                    else -> menuOpen = true
+                }
+            },
             onLongClick = { menuOpen = true },
         ),
     )
 }
 
 @Composable
-private fun Actions(entry: DavResource, controller: BrowserController, cast: CastController?, close: () -> Unit) {
+private fun Actions(
+    entry: DavResource,
+    controller: BrowserController,
+    cast: CastController?,
+    onPlay: (() -> Unit)?,
+    close: () -> Unit,
+) {
+    if (onPlay != null) Action(Glyph.PLAY, "Play") { close(); onPlay() }
     if (!entry.isDirectory) {
         // Two different things: one shows the file, the other keeps it.
         Action(Glyph.OPEN, "Open") { close(); controller.openFile(entry) }

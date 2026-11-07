@@ -52,6 +52,19 @@
             android:name="dev.stratus.core.cast.CastRelayService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <!--
+          The music player (stratus-app#180). Exported because a headset, a
+          car and the lock screen are other apps, and they find a player by
+          this action.
+        -->
+        <service
+            android:name="dev.stratus.core.play.PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"

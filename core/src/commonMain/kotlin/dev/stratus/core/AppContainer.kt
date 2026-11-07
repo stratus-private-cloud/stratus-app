@@ -14,6 +14,8 @@ import dev.stratus.core.dav.DavClient
 import dev.stratus.core.documents.DocumentRef
 import dev.stratus.core.documents.DocumentTree
 import dev.stratus.core.files.BrowserController
+import dev.stratus.core.play.MusicController
+import dev.stratus.core.play.Player
 import dev.stratus.core.files.isStratusAtOrigin
 import dev.stratus.core.files.FileHandoff
 import dev.stratus.core.files.SearchController
@@ -68,6 +70,8 @@ class AppContainer(
     private val liveTransfers: (suspend () -> Set<String>)? = null,
     /** What this connection costs, which only the platform knows (stratus-app#133). */
     private val network: Network = Network { false },
+    /** The platform's player, or null where there is none yet. */
+    private val player: Player? = null,
 ) {
     private val instances = ServerStore(secure, serversChanged)
 
@@ -175,6 +179,20 @@ class AppContainer(
         )
     }
 
+    /** Playing music in the app, or null where this platform has no player or nobody is signed in. */
+    suspend fun music(scope: CoroutineScope): MusicController? {
+        val player = player ?: return null
+        val instance = instances.instance() ?: return null
+        val credentials = instances.credentials() ?: return null
+        return MusicController(
+            player,
+            ShareLinks(instance.baseUrl, credentials),
+            cover = { album -> thumbnails.cover(album, COVER_PIXELS) },
+            trust = TrustPolicy(trust.pins()[hostPortOf(instance.baseUrl)]),
+            scope = scope,
+        )
+    }
+
     /**
      * What the server will draw of a file, for everything that shows a grid.
      *
@@ -221,3 +239,6 @@ class AppContainer(
         return SearchController(connection.dav, scope)
     }
 }
+
+/** Big enough for a lock screen, small enough to hand to a player with every track of an album. */
+private const val COVER_PIXELS = 300

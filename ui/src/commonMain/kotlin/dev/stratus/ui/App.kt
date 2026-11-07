@@ -37,6 +37,9 @@ import dev.stratus.ui.backup.BackupScreen
 import dev.stratus.ui.backup.BackupStrip
 import dev.stratus.ui.backup.oneLine
 import dev.stratus.ui.files.BrowserScreen
+import dev.stratus.ui.files.MiniPlayer
+import dev.stratus.core.play.MusicController
+import androidx.compose.foundation.layout.Column
 import dev.stratus.ui.files.SearchScreen
 import dev.stratus.ui.server.ServerScreen
 import dev.stratus.ui.server.SourcesScreen
@@ -187,6 +190,7 @@ private fun SignedIn(
     }
     var search by remember { mutableStateOf<SearchController?>(null) }
     var cast by remember { mutableStateOf<CastController?>(null) }
+    var music by remember { mutableStateOf<MusicController?>(null) }
     // Collected rather than read off the flow where the bar is drawn. Reading
     // `.value` in composition subscribes to nothing, so the glyph appeared
     // only if something else happened to recompose after the probe answered
@@ -216,6 +220,7 @@ private fun SignedIn(
         // than either answer.
         search = container.search(scope)?.also { it.start() }
         cast = container.cast(scope)
+        music = container.music(scope)
     }
 
     LaunchedEffect(search) {
@@ -369,7 +374,14 @@ private fun SignedIn(
                     },
                     onEditServer = onEdit,
                     banner = { BackupStrip(state.backupState) { go(Screen.Backup) } },
-                    bottomBar = { if (parts.size > 1) Parts(part, ::show) },
+                    bottomBar = {
+                        Column {
+                            music?.let { MiniPlayer(it) }
+                            if (parts.size > 1) Parts(part, ::show)
+                        }
+                    },
+                    music = music,
+                    playOnTap = part == Part.Music,
                     cover = { entry -> pictureOf(container, entry) },
                     // Albums under an artist, and recordings under a month:
                     // the two places the web draws a grid.

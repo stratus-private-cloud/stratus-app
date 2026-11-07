@@ -80,6 +80,21 @@ class BrowserTest : E2E() {
         assertFalse(Stratus.exists("/$unique/doomed.txt"))
     }
 
+    // stratus-app#180: through the media session in its own service. The
+    // bytes are not audio, so this proves the queue reaches the player and
+    // comes back to the screen, not that anything is heard.
+    @Test
+    fun aTrackIsHandedToThePlayer() {
+        Stratus.folder("/$unique/")
+        Stratus.file("/$unique/tune-$unique.mp3")
+        signedIn()
+        tap(unique)
+
+        tap("tune-$unique.mp3")
+        tap("Play")
+        see("tune-$unique", substring = false)
+    }
+
     @Test
     fun whatWasDeletedIsInTheTrash() {
         Stratus.folder("/$unique/")

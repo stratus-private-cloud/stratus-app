@@ -40,6 +40,8 @@ targets:
         # about, and refuses the mode without the capability.
         UIBackgroundModes:
           - processing
+          # Music keeps playing with the screen locked (stratus-app#180).
+          - audio
         BGTaskSchedulerPermittedIdentifiers:
           - dev.stratus.backup
         # Asked the first time the app looks for a television (stratus-app#153).

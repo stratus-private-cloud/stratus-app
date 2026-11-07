@@ -14,6 +14,7 @@ lifecycleRuntime = "2.10.0"
 # and no platform. Same wall as Compose above; raise both when it appears.
 androidxCore = "1.18.0"
 androidxMediarouter = "1.8.1"
+media3 = "1.8.0"
 playServicesCast = "22.3.1"
 androidxTest = "1.7.0"
 androidxWork = "2.11.0"
@@ -51,6 +52,12 @@ androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidxCore
 # from it directly.
 play-services-cast = { module = "com.google.android.gms:play-services-cast-framework", version.ref = "playServicesCast" }
 androidx-mediarouter = { module = "androidx.mediarouter:mediarouter", version.ref = "androidxMediarouter" }
+# The player (stratus-app#180): ExoPlayer, fetching through OkHttp so that a
+# pinned certificate is trusted as everywhere else, and the media session that
+# keeps it playing in the background and answers the lock screen.
+media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
+media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3" }
+media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
 androidx-work = { module = "androidx.work:work-runtime-ktx", version.ref = "androidxWork" }
 androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "androidxWork" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTest" }

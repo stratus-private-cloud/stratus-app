@@ -65,6 +65,16 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+        <!--
+          A film, full screen. Turning the phone is not a
+          reason to start the film again, so the activity keeps itself
+          through every change a rotation or a fold makes.
+        -->
+        <activity
+            android:name="dev.stratus.core.play.VideoActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode" />
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"

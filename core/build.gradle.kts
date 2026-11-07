@@ -107,6 +107,7 @@ kotlin {
             implementation(libs.media3.exoplayer)
             implementation(libs.media3.datasource.okhttp)
             implementation(libs.media3.session)
+            implementation(libs.media3.ui)
             // Already in the APK through :ui; named here so casting can report
             // what it did, which is the only way to see a television's side.
             implementation(libs.sentry)

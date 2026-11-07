@@ -261,7 +261,19 @@ The player is given signed links, the same ones a television is, so it needs no
 password and works against any server that understands them. Two limits: **on
 iOS a certificate only this phone vouches for is refused**, because the system's
 player fetches with the system's trust and not the app's, and plays are not
-counted on the server yet. Video is not played in the app yet.
+counted on the server yet.
+
+## Watching a film
+
+In 🎬 Videos, tapping a recording plays it full screen; anywhere else, a film's
+menu has ▶️ Play, and 👁️ Open still hands it to another app. MP4 and QuickTime
+-- what a phone records -- are played as they are, which costs the server
+nothing; anything else is the server's HLS, which copies the picture across and
+re-encodes only what the phone could not decode. On Android a file that turns
+out to hold a codec the phone lacks is retried as HLS. Android's player is the
+app's own, iOS's is the system's, with AirPlay and picture in picture. Starting
+a film pauses the music. Not yet: carrying on where you stopped, subtitles, and
+playing a film with the screen off.
 
 ## Sharing
 

@@ -14,6 +14,7 @@ import dev.stratus.core.cast.dlna.DlnaCaster
 import dev.stratus.core.cast.dlna.DlnaControl
 import dev.stratus.core.files.AndroidFileHandoff
 import dev.stratus.core.play.AndroidPlayer
+import dev.stratus.core.play.AndroidVideoScreen
 import dev.stratus.core.net.MOST_AT_ONCE_PER_HOST
 import dev.stratus.core.net.PinnedHostnameVerifier
 import dev.stratus.core.net.PinningTrustManager
@@ -99,6 +100,7 @@ private fun build(application: Context): AppContainer {
         assets = AndroidAssetSource(application),
         network = AndroidNetwork(application),
         player = AndroidPlayer(application),
+        videoScreen = AndroidVideoScreen(application),
         // Files keeps the storage locations a provider offers until something
         // tells it they moved, so a server added or removed would otherwise
         // not show up there until the next reboot (stratus-app#104).

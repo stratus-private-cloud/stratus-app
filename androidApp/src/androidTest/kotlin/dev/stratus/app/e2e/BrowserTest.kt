@@ -7,6 +7,9 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Until
+import dev.stratus.core.play.VideoActivity
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -93,6 +96,25 @@ class BrowserTest : E2E() {
         tap("tune-$unique.mp3")
         tap("Play")
         see("tune-$unique", substring = false)
+    }
+
+    // A film opens full screen in an activity of its own. The bytes are not a
+    // film, so this proves the hand-over, not the picture.
+    @Test
+    fun aFilmOpensInThePlayer() {
+        Stratus.folder("/$unique/")
+        Stratus.file("/$unique/clip-$unique.mp4")
+        signedIn()
+        tap(unique)
+
+        tap("clip-$unique.mp4")
+        tap("Play")
+        assertTrue(
+            Phone.device.wait(Until.hasObject(By.desc(VideoActivity.DESCRIPTION)), 15_000) == true,
+            "the player never opened",
+        )
+        goBack()
+        see("clip-$unique.mp4")
     }
 
     @Test

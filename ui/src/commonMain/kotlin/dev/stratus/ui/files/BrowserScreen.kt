@@ -205,10 +205,13 @@ internal fun Entry(
             // Anchored to the gear rather than the row, so the menu opens
             // where the finger is, as the web's opens under its button.
             Box {
+                // The gear is named by its description and not by its text:
+                // the bar's Settings is the same emoji, and that one is the
+                // button a test or a screen reader finds by "⚙️".
                 IconButton(
                     onClick = { menuOpen = true },
                     modifier = Modifier.semantics { contentDescription = "Actions on ${entry.name}" },
-                ) { Text(Glyph.ACTIONS) }
+                ) { Text(Glyph.ACTIONS, Modifier.clearAndSetSemantics {}) }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     Actions(entry, controller, cast, close = { menuOpen = false })
                 }

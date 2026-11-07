@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.stratus.core.calendars.CalendarSetup
 import dev.stratus.core.server.Server
 import dev.stratus.ui.ActionRow
 import dev.stratus.ui.FactRow
@@ -30,6 +31,9 @@ fun ServerScreen(
     onSignOut: () -> Unit,
     /** Opens the sign-in form on this server, filled in, to change any of it. */
     onEdit: () -> Unit,
+    /** What this phone's calendars and contacts would be handed to; null hides the row. */
+    calendars: CalendarSetup?,
+    onCalendars: (CalendarSetup) -> Unit,
     onClose: () -> Unit,
 ) {
     var signingOut by remember { mutableStateOf(false) }
@@ -47,6 +51,17 @@ fun ServerScreen(
             "The sign-in form again, filled in. The backup record is kept.",
             onClick = onEdit,
         )
+        calendars?.let { setup ->
+            ActionRow(
+                Glyph.EVENT,
+                "Calendars and contacts",
+                when (setup) {
+                    is CalendarSetup.Davx5 -> "Opens DAVx⁵ with this server, the user and the password filled in."
+                    is CalendarSetup.Page -> "Opens the server's page that sets up this phone's own accounts."
+                },
+                onClick = { onCalendars(setup) },
+            )
+        }
         // "Sign out" and not "Remove": with one server there is nothing to
         // remove it from, and what it costs is said in the dialog rather than
         // guessed at from the word.

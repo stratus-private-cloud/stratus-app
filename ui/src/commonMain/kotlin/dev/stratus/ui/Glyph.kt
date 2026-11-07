@@ -59,6 +59,13 @@ object Glyph {
     const val VIDEOS = FILM
     const val TRASH = DELETE
 
+    // The player's buttons.
+    const val PLAY = "▶️"
+    const val PAUSE = "⏸️"
+    const val NEXT = "⏭️"
+    const val PREVIOUS = "⏮️"
+    const val STOP = "⏹️"
+
     const val BACK = "←"
     const val MORE = "›"
 }

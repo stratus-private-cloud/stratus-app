@@ -401,6 +401,15 @@ Three surfaces, and no more than three:
    a second API; against any other server, or a Stratus pointed below its
    origin, there is one browser where it was pointed and no bar.
 
+   **Music plays in the app** (stratus-app#180), behind a `Player` each
+   platform implements and a `MusicController` in common code that turns a
+   folder into a queue of signed links -- the cast's links, so the player
+   needs no credentials. Android is Media3, the one library added for it: an
+   ExoPlayer inside a `MediaSessionService`, fetching through an OkHttp client
+   built with the app's own pinning, because a self-hosted certificate is the
+   normal case. iOS is `AVPlayer` with a queue of our own, since
+   `AVQueuePlayer` forgets a track once it has played; it cannot honour a pin.
+
    **Its bar is the app's bar** (stratus-app#140): the mark and the word
    `Stratus` on the left, the menu on the right, and the same thing whatever
    folder is open -- which is the web UI's navbar, and deliberately. What was

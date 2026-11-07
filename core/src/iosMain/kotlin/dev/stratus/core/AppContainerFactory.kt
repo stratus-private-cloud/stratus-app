@@ -2,6 +2,7 @@ package dev.stratus.core
 
 import dev.stratus.core.backup.IosAssetSource
 import dev.stratus.core.files.IosFileHandoff
+import dev.stratus.core.play.IosPlayer
 import dev.stratus.core.net.MOST_AT_ONCE_PER_HOST
 import dev.stratus.core.net.darwinTrust
 import dev.stratus.core.net.basicAuthHeader
@@ -118,6 +119,8 @@ private fun build(registersDomains: Boolean): AppContainer {
     databasePath = databasePath(),
     assets = IosAssetSource(),
     network = IosNetwork(),
+    // The app's alone: the File Provider extension has nothing to play.
+    player = if (registersDomains) IosPlayer() else null,
     // A store of its own rather than the container's, which does not exist
     // yet here. It is a view of the keychain and holds nothing, so a second
     // one costs nothing either.

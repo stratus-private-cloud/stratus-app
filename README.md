@@ -246,9 +246,22 @@ where no proxy has rewritten it.
 Signed in at any other address, or against any other server, there is one
 browser and it opens where it was pointed.
 
-What is not there yet: a track opens in another app or casts rather than
-playing here (stratus-app#180), and the trash can be looked through and copied
-out of but not restored from (stratus-app#179).
+What is not there yet: the trash can be looked through and copied out of but
+not restored from (stratus-app#179).
+
+## Playing music
+
+In 🎵 Music, tapping a track plays the album from there to the end; anywhere
+else, a track's menu has ▶️ Play, which plays the folder the same way. A bar
+above the sections shows what is playing, with ⏮️ ⏯️ ⏭️ ⏹️, and it carries on
+with the screen locked, answering the lock screen and a headset -- a media
+session in a service of its own on Android, the system's audio session on iOS.
+
+The player is given signed links, the same ones a television is, so it needs no
+password and works against any server that understands them. Two limits: **on
+iOS a certificate only this phone vouches for is refused**, because the system's
+player fetches with the system's trust and not the app's, and plays are not
+counted on the server yet. Video is not played in the app yet.
 
 ## Sharing
 

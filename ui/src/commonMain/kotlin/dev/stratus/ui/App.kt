@@ -21,6 +21,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import dev.stratus.core.AppContainer
+import dev.stratus.core.calendars.CalendarSetup
 import dev.stratus.core.session.Ask
 import dev.stratus.core.cast.CastController
 import dev.stratus.core.files.BrowserController
@@ -198,6 +199,7 @@ private fun SignedIn(
     // only if something else happened to recompose after the probe answered
     // -- which the emulator caught and no JVM test could have.
     var canSearch by remember { mutableStateOf(false) }
+    var calendars by remember { mutableStateOf<CalendarSetup?>(null) }
 
     LaunchedEffect(Unit) { signedIn.start() }
 
@@ -224,6 +226,7 @@ private fun SignedIn(
         cast = container.cast(scope)
         music = container.music(scope)
         videos = container.videos()
+        calendars = container.calendarSetup()
     }
 
     LaunchedEffect(search) {
@@ -296,6 +299,8 @@ private fun SignedIn(
                     }
                 },
                 onEdit = onEdit,
+                calendars = calendars,
+                onCalendars = { setup -> scope.launch { container.openCalendars(setup) } },
                 onClose = { leave() },
             )
         }

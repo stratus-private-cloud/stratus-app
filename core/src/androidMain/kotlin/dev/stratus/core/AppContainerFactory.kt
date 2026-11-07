@@ -3,6 +3,7 @@ package dev.stratus.core
 import android.content.Context
 import android.provider.DocumentsContract
 import dev.stratus.core.backup.AndroidAssetSource
+import dev.stratus.core.calendars.Davx5Handoff
 import dev.stratus.core.backup.AndroidNetwork
 import dev.stratus.core.cast.AndroidCaster
 import dev.stratus.core.cast.AndroidRelay
@@ -98,6 +99,7 @@ private fun build(application: Context): AppContainer {
         ),
         databasePath = application.filesDir.resolve("backup.db").absolutePath,
         assets = AndroidAssetSource(application),
+        calendars = Davx5Handoff(application),
         network = AndroidNetwork(application),
         player = AndroidPlayer(application),
         videoScreen = AndroidVideoScreen(application),

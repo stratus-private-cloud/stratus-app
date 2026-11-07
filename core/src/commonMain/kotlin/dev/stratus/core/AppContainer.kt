@@ -1,5 +1,8 @@
 package dev.stratus.core
 
+import dev.stratus.core.calendars.CalendarHandoff
+import dev.stratus.core.calendars.CalendarSetup
+import dev.stratus.core.calendars.calendarSetup
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import dev.stratus.core.backup.AssetSource
 import dev.stratus.core.backup.Backup
@@ -76,6 +79,8 @@ class AppContainer(
     private val player: Player? = null,
     /** The platform's full-screen film player, or null where there is none. */
     private val videoScreen: VideoScreen? = null,
+    /** What calendars and contacts are handed to (stratus-app#185), or null where nothing takes them. */
+    private val calendars: CalendarHandoff? = null,
 ) {
     private val instances = ServerStore(secure, serversChanged)
 
@@ -227,6 +232,19 @@ class AppContainer(
      */
     fun documents(scope: CoroutineScope, changed: (DocumentRef) -> Unit): DocumentTree =
         DocumentTree(instances, connections, thumbnails, scope, changed)
+
+    /** What setting this phone's calendars and contacts up would hand over, or null when nothing would. */
+    suspend fun calendarSetup(): CalendarSetup? {
+        val handoff = calendars ?: return null
+        val instance = instances.instance() ?: return null
+        val credentials = instances.credentials() ?: return null
+        val stratus = !handoff.toDavx5 && isStratusAtOrigin()
+        return calendarSetup(instance.baseUrl, credentials, handoff.toDavx5, stratus)
+    }
+
+    suspend fun openCalendars(setup: CalendarSetup) {
+        calendars?.open(setup)
+    }
 
     /** Null when nobody is signed in, which is the only state it can be built from. */
     /** Whether the server is a Stratus pointed at its origin, so the app can show its sections. */

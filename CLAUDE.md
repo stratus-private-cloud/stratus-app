@@ -488,6 +488,18 @@ Three surfaces, and no more than three:
    the server keeps its backup record, which signing out and in again would
    throw away (stratus-app#87, stratus-app#131).
 
+   **Server also hands calendars and contacts to what syncs them**
+   (stratus-app#185), since the app syncs neither. On Android that is DAVx5,
+   started on its login with the extras `username` and `password` and the
+   address as `davx5://` or `caldav://` -- its own names for https and http --
+   and **pinned to its package**, because anything can claim the scheme and
+   this intent carries the password. On iOS an app cannot add a CalDAV account
+   at all, so it opens the page a Stratus serves a profile from
+   (stratus-backend#485), and only on a Stratus at its origin: that page is
+   the one Stratus-shaped thing here, and it is a link to a web page rather
+   than a call. What to hand over is `calendarSetup` in common code; the two
+   platforms only open it.
+
    **And it ends with the build it is** (stratus-app#148). The APK at `latest`
    is replaced on every push, so "which one am I running" is a question
    somebody has before reporting that anything else is wrong -- and the reason

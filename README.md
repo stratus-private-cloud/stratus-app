@@ -290,6 +290,16 @@ Nothing is written down either, which is what the choice of lifetime is for.
 There is no list of what you have shared, no withdrawing one link on its own,
 and renaming a shared file breaks its link.
 
+## Calendars and contacts
+
+The app does not sync them; it sets up what does. **Calendars and contacts**
+under Server opens [DAVx5](https://www.davx5.com) on Android with the server,
+the user and the password already filled in, or its store page when it is not
+installed -- against any server DAVx5 can reach. On iOS an app cannot add a
+CalDAV account, so on a Stratus the row opens the server's own page in Safari,
+which hands out a profile the system installs; against any other server it is
+not shown.
+
 ## Casting
 
 Hold a photograph or a video and send it to a Chromecast. It uses Google's

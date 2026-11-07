@@ -410,6 +410,13 @@ Three surfaces, and no more than three:
    normal case. iOS is `AVPlayer` with a queue of our own, since
    `AVQueuePlayer` forgets a track once it has played; it cannot honour a pin.
 
+   **Films play full screen**, on a `VideoScreen` each platform implements:
+   an activity of its own with Media3's `PlayerView` on Android, and
+   `AVPlayerViewController` on iOS. Which URL is common code
+   (`videoSourceFor`): MP4 and QuickTime as they are, with the server's HLS
+   as Android's fallback for a codec the phone lacks, and HLS for everything
+   else -- so the server only works for the films a phone cannot take.
+
    **Its bar is the app's bar** (stratus-app#140): the mark and the word
    `Stratus` on the left, the menu on the right, and the same thing whatever
    folder is open -- which is the web UI's navbar, and deliberately. What was

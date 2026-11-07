@@ -7,6 +7,11 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasSetTextAction
+import android.app.Activity
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
+import dev.stratus.core.play.VideoActivity
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -95,6 +100,24 @@ class BrowserTest : E2E() {
         see("tune-$unique", substring = false)
     }
 
+    // A film opens full screen in an activity of its own. The bytes are not a
+    // film, so this proves the hand-over, not the picture.
+    @Test
+    fun aFilmOpensInThePlayer() {
+        Stratus.folder("/$unique/")
+        Stratus.file("/$unique/clip-$unique.mp4")
+        signedIn()
+        tap(unique)
+
+        tap("clip-$unique.mp4")
+        tap("Play")
+        // Asked of the instrumentation rather than of the screen: a player
+        // view does not show up in UiAutomator's tree by its description.
+        ui.waitUntil(15_000) { inFront() is VideoActivity }
+        goBack()
+        see("clip-$unique.mp4")
+    }
+
     @Test
     fun whatWasDeletedIsInTheTrash() {
         Stratus.folder("/$unique/")
@@ -174,5 +197,13 @@ class BrowserTest : E2E() {
         see("Looking for screens on this network…")
         tap("Cancel")
         see("film.mp4")
+    }
+
+    private fun inFront(): Activity? {
+        var found: Activity? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            found = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).firstOrNull()
+        }
+        return found
     }
 }

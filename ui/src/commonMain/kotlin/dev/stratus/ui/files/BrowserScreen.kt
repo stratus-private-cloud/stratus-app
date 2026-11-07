@@ -65,6 +65,7 @@ import dev.stratus.core.files.BrowserController
 import dev.stratus.core.files.BrowserFailure
 import dev.stratus.core.files.Confirmation
 import dev.stratus.core.play.MusicController
+import dev.stratus.core.play.VideoController
 import dev.stratus.core.share.ShareLife
 import dev.stratus.ui.Glyph
 import dev.stratus.ui.StratusMark
@@ -95,7 +96,9 @@ fun BrowserScreen(
     onClose: (() -> Unit)? = null,
     /** Playing a track here, or null where this platform has no player. */
     music: MusicController? = null,
-    /** Whether tapping a track plays it, which is what the Music section is for. */
+    /** Playing a film here, or null where this platform cannot. */
+    videos: VideoController? = null,
+    /** Whether tapping a track or a film plays it, which is what Music and Videos are for. */
     playOnTap: Boolean = false,
 ) {
     val state by controller.state.collectAsState()
@@ -172,14 +175,17 @@ fun BrowserScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(state.entries, key = { it.path }) { entry -> Tile(entry, controller, cover) }
+                        items(state.entries, key = { it.path }) { entry ->
+                            Tile(entry, controller, cover, onPlay = videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } })
+                        }
                     }
                 } else {
                     LazyColumn(Modifier.fillMaxSize()) {
                         items(state.entries, key = { it.path }) { entry ->
                             Entry(
                                 entry, controller, cast,
-                                onPlay = music?.takeIf { it.canPlay(entry) }?.let { m -> { m.play(state.entries, entry) } },
+                                onPlay = music?.takeIf { it.canPlay(entry) }?.let { m -> { m.play(state.entries, entry) } }
+                                    ?: videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } },
                                 playOnTap = playOnTap,
                             )
                             HorizontalDivider()
@@ -230,10 +236,21 @@ private fun Where(path: String, floor: String, up: () -> Unit) {
  * name under it -- the web's album grid. Tapping walks in, as a row does.
  */
 @Composable
-private fun Tile(entry: DavResource, controller: BrowserController, cover: suspend (DavResource) -> ImageBitmap?) {
+private fun Tile(
+    entry: DavResource,
+    controller: BrowserController,
+    cover: suspend (DavResource) -> ImageBitmap?,
+    onPlay: (() -> Unit)? = null,
+) {
     val picture by produceState<ImageBitmap?>(null, entry.path) { value = cover(entry) }
     Column(
-        Modifier.clickable { if (entry.isDirectory) controller.enter(entry) else controller.openFile(entry) },
+        Modifier.clickable {
+            when {
+                entry.isDirectory -> controller.enter(entry)
+                onPlay != null -> onPlay()
+                else -> controller.openFile(entry)
+            }
+        },
     ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))

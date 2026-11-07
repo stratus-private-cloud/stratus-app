@@ -16,6 +16,8 @@ import dev.stratus.core.documents.DocumentTree
 import dev.stratus.core.files.BrowserController
 import dev.stratus.core.play.MusicController
 import dev.stratus.core.play.Player
+import dev.stratus.core.play.VideoController
+import dev.stratus.core.play.VideoScreen
 import dev.stratus.core.files.isStratusAtOrigin
 import dev.stratus.core.files.FileHandoff
 import dev.stratus.core.files.SearchController
@@ -72,6 +74,8 @@ class AppContainer(
     private val network: Network = Network { false },
     /** The platform's player, or null where there is none yet. */
     private val player: Player? = null,
+    /** The platform's full-screen film player, or null where there is none. */
+    private val videoScreen: VideoScreen? = null,
 ) {
     private val instances = ServerStore(secure, serversChanged)
 
@@ -190,6 +194,18 @@ class AppContainer(
             cover = { album -> thumbnails.cover(album, COVER_PIXELS) },
             trust = TrustPolicy(trust.pins()[hostPortOf(instance.baseUrl)]),
             scope = scope,
+        )
+    }
+
+    /** Playing films in the app, or null where this platform cannot or nobody is signed in. */
+    suspend fun videos(): VideoController? {
+        val screen = videoScreen ?: return null
+        val instance = instances.instance() ?: return null
+        val credentials = instances.credentials() ?: return null
+        return VideoController(
+            screen,
+            ShareLinks(instance.baseUrl, credentials),
+            TrustPolicy(trust.pins()[hostPortOf(instance.baseUrl)]),
         )
     }
 

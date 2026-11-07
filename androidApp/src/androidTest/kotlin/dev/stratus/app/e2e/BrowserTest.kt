@@ -7,8 +7,10 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.Until
+import android.app.Activity
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import dev.stratus.core.play.VideoActivity
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -109,10 +111,9 @@ class BrowserTest : E2E() {
 
         tap("clip-$unique.mp4")
         tap("Play")
-        assertTrue(
-            Phone.device.wait(Until.hasObject(By.desc(VideoActivity.DESCRIPTION)), 15_000) == true,
-            "the player never opened",
-        )
+        // Asked of the instrumentation rather than of the screen: a player
+        // view does not show up in UiAutomator's tree by its description.
+        ui.waitUntil(15_000) { inFront() is VideoActivity }
         goBack()
         see("clip-$unique.mp4")
     }
@@ -196,5 +197,13 @@ class BrowserTest : E2E() {
         see("Looking for screens on this network…")
         tap("Cancel")
         see("film.mp4")
+    }
+
+    private fun inFront(): Activity? {
+        var found: Activity? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            found = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).firstOrNull()
+        }
+        return found
     }
 }

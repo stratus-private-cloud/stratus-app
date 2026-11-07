@@ -104,7 +104,7 @@ class VideoActivity : Activity() {
         internal const val FALLBACK = "fallback"
         internal const val TITLE = "title"
 
-        /** What the player is named by, to a screen reader and to the end-to-end suite. */
+        /** What the player is named by to a screen reader. */
         const val DESCRIPTION = "Video player"
     }
 }

@@ -233,6 +233,13 @@ Stratus keeps an index of what is inside a file. And **there is no second
 page** -- a search that found more than it will give says so, and the way to
 the rest is a narrower word.
 
+## Where the browser opens
+
+On a Stratus signed in at its origin, the browser opens on `files/` rather
+than on the list of collections, the same tree the web UI starts on. It knows
+by the `Server: Stratus/<version>` header of one `OPTIONS`. Signed in at any
+other address, or against any other server, it opens where it was pointed.
+
 ## Sharing
 
 Hold a row in the browser and the app makes a link anybody can open without an

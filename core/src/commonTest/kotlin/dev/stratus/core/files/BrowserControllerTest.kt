@@ -12,7 +12,9 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.request.HttpRequestData
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -72,18 +74,20 @@ class BrowserControllerTest {
     private fun controller(
         scope: TestScope,
         links: LinkSupport = support(),
+        server: String? = null,
+        base: String = "http://host/",
         answer: (HttpRequestData) -> Pair<HttpStatusCode, String>,
     ): BrowserController {
         val engine = MockEngine { request ->
             seen += request
             val (status, body) = answer(request)
-            respond(body, status)
+            respond(body, status, if (server == null) headersOf() else headersOf(HttpHeaders.Server, server))
         }
         return BrowserController(
             // The origin, as sign-in settles on it: the browser walks the
             // whole namespace and an entry's path carries the collection it
             // is in, which is what a share link is built from.
-            DavClient(HttpClient(engine), "http://host/"),
+            DavClient(HttpClient(engine), base),
             handoff,
             scope,
             Sharing(
@@ -111,6 +115,35 @@ class BrowserControllerTest {
         browser.start()
         browser.settled()
         assertEquals(listOf("photos", "Apple.txt", "zebra.txt"), browser.state.value.entries.map { it.name })
+    }
+
+    @Test
+    fun aStratusOpensOnItsFiles() = runTest {
+        val browser = controller(this, server = "Stratus/1.2.3", answer = listingOf("/files/photos" to true))
+        browser.start()
+        val state = browser.settled()
+        assertEquals("/files/", state.path)
+        assertEquals("/files/", seen.last().url.encodedPath)
+    }
+
+    @Test
+    fun aStratusPointedBelowItsOriginOpensWhereItWasPointed() = runTest {
+        val browser = controller(
+            this,
+            server = "Stratus/1.2.3",
+            base = "http://host/files/music/",
+            answer = listingOf("/files/music/album" to true),
+        )
+        browser.start()
+        assertEquals("/", browser.settled().path)
+        assertEquals("/files/music/", seen.last().url.encodedPath)
+    }
+
+    @Test
+    fun anyOtherServerOpensOnItsRoot() = runTest {
+        val browser = controller(this, server = "Apache/2.4", answer = listingOf("/photos" to true))
+        browser.start()
+        assertEquals("/", browser.settled().path)
     }
 
     @Test
@@ -257,6 +290,7 @@ class BrowserControllerTest {
         val browser = controller(this, answer = listingOf("/files/photos/a.txt" to false))
         browser.start()
         browser.settled()
+        seen.clear()
         val target = browser.state.value.entries.single()
 
         browser.ask(Confirmation.Share(target))
@@ -267,7 +301,7 @@ class BrowserControllerTest {
         assertEquals("a.txt", sheet.label)
         // A link is arithmetic over the password: the first the server hears of
         // it is when somebody opens it.
-        assertEquals(listOf("PROPFIND"), seen.map { it.method.value }.distinct())
+        assertEquals(emptyList(), seen.map { it.method.value })
         assertNull(browser.state.value.pending)
     }
 

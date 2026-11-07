@@ -25,7 +25,8 @@ import kotlinx.io.RawSource
  * Nothing here is specific to Stratus, and that is a constraint rather than an
  * accident: the app has to work against any WebDAV server, so a feature that
  * would be easier with a private endpoint is a conversation and not a commit.
- * See CLAUDE.md.
+ * See CLAUDE.md. [serverName] says who answered; what the app does with that
+ * is decided above this class.
  *
  * [baseUrl] is the collection the app is rooted at, such as
  * `http://host:8080/dav/`. Every [path] below is relative to it and given
@@ -92,6 +93,13 @@ class DavClient(
         // several times; ours is the only one this client can write.
         return response.headers.getAll(DASL).orEmpty().any { it.contains(GRAMMAR) }
     }
+
+    /**
+     * What the server calls itself, from the `Server` header of one `OPTIONS`
+     * at the root, or null when it does not say.
+     */
+    suspend fun serverName(): String? =
+        http.request(url("/", collection = true)) { method = HttpMethod.Options }.headers[HttpHeaders.Server]
 
     /**
      * Files and folders whose **name** holds [text], under [under] -- a folder

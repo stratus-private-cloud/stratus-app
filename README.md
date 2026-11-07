@@ -237,7 +237,8 @@ the rest is a narrower word.
 
 On a Stratus signed in at its origin, the browser opens on `files/` rather
 than on the list of collections, the same tree the web UI starts on. It knows
-by the `Server: Stratus/<version>` header of one `OPTIONS`. Signed in at any
+by the `Stratus-Version` header of one `OPTIONS`, or `Server: Stratus/…` where
+no proxy has rewritten it. Signed in at any
 other address, or against any other server, it opens where it was pointed.
 
 ## Sharing

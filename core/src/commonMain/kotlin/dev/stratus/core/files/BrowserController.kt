@@ -56,19 +56,12 @@ class BrowserController(
         mutable.value = mutable.value.copy(busy = true, failure = null, pending = null)
         running = scope.launch {
             var path = mutable.value.path
-            if (path == "/" && dav.basePath.isEmpty() && isStratus()) path = STRATUS_HOME
+            if (path == "/" && dav.isStratusAtOrigin()) path = STRATUS_HOME
             mutable.value = mutable.value.copy(path = path)
             load(path)
         }
     }
 
-    private suspend fun isStratus(): Boolean = try {
-        dav.serverName()?.startsWith("Stratus/") == true
-    } catch (e: CancellationException) {
-        throw e
-    } catch (_: Exception) {
-        false
-    }
 
     fun enter(directory: DavResource) = go(directory.path)
 
@@ -226,6 +219,21 @@ class BrowserController(
 }
 
 internal const val STRATUS_HOME = "/files/"
+
+/**
+ * Whether this is a Stratus and the app is pointed at its origin. Pointed
+ * anywhere below that, somebody chose where to be, and it is respected.
+ *
+ * A server that cannot be asked is not a Stratus: whatever is shown next is
+ * what reports it unreachable.
+ */
+suspend fun DavClient.isStratusAtOrigin(): Boolean = basePath.isEmpty() && try {
+    stratusVersion() != null
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Exception) {
+    false
+}
 
 /**
  * Folders first and then by name, which is how a listing is read.

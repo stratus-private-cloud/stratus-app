@@ -140,6 +140,20 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun aStratusBehindAProxyIsKnownByItsOwnHeader() = runTest {
+        val engine = MockEngine { request ->
+            seen += request
+            respond(listing("/files/photos" to true), HttpStatusCode.MultiStatus, headersOf(
+                HttpHeaders.Server to listOf("Fly/366e4bf88"),
+                "Stratus-Version" to listOf("1.2.3"),
+            ))
+        }
+        val browser = BrowserController(DavClient(HttpClient(engine), "http://host/"), handoff, this)
+        browser.start()
+        assertEquals("/files/", browser.settled().path)
+    }
+
+    @Test
     fun anyOtherServerOpensOnItsRoot() = runTest {
         val browser = controller(this, server = "Apache/2.4", answer = listingOf("/photos" to true))
         browser.start()

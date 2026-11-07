@@ -25,6 +25,13 @@ import dev.stratus.core.session.Ask
 import dev.stratus.core.cast.CastController
 import dev.stratus.core.files.BrowserController
 import dev.stratus.core.files.SearchController
+import dev.stratus.core.dav.DavResource
+import dev.stratus.core.media.Thumbnail
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import dev.stratus.core.signin.SignInState
 import dev.stratus.ui.backup.BackupScreen
 import dev.stratus.ui.backup.BackupStrip
@@ -46,6 +53,26 @@ private sealed interface Screen {
     data object Backup : Screen
     data object Server : Screen
     data object Sources : Screen
+    data object Trash : Screen
+}
+
+/**
+ * The parts of a Stratus the bottom bar moves between, each a browser that
+ * cannot climb out of its own collection. Against any other server there is
+ * one browser at the root and no bar.
+ */
+private enum class Part(val glyph: String, val label: String, val floor: String) {
+    Files(Glyph.FILES, "Files", "/files/"),
+    Music(Glyph.MUSIC, "Music", "/music/"),
+    Videos(Glyph.VIDEOS, "Videos", "/videos/"),
+}
+
+private const val TRASH = "/trash/"
+
+/** How deep [path] is under [floor], or -1 when it is not under it. */
+private fun depth(path: String, floor: String): Int {
+    if (!path.startsWith(floor.trimEnd('/'))) return -1
+    return path.removePrefix(floor.trimEnd('/')).trim('/').split('/').count { it.isNotEmpty() }
 }
 
 @Composable
@@ -148,6 +175,16 @@ private fun SignedIn(
         return true
     }
     var browser by remember { mutableStateOf<BrowserController?>(null) }
+    var parts by remember { mutableStateOf<Map<Part, BrowserController>>(emptyMap()) }
+    var part by remember { mutableStateOf(Part.Files) }
+    var trash by remember { mutableStateOf<BrowserController?>(null) }
+    // A part is listed the first time it is opened rather than at sign-in:
+    // three listings for one screen would be two nobody asked for.
+    val listed = remember { mutableSetOf<Part>() }
+    fun show(next: Part) {
+        part = next
+        browser = parts[next]?.also { if (listed.add(next)) it.start() }
+    }
     var search by remember { mutableStateOf<SearchController?>(null) }
     var cast by remember { mutableStateOf<CastController?>(null) }
     // Collected rather than read off the flow where the bar is drawn. Reading
@@ -164,7 +201,15 @@ private fun SignedIn(
     // whoever tapped first.
     LaunchedEffect(baseUrl, state.server) {
         if (state.server == null) return@LaunchedEffect
-        browser = container.browser(scope)?.also { it.start() }
+        listed.clear()
+        part = Part.Files
+        parts = if (container.isStratusAtOrigin()) {
+            Part.entries.mapNotNull { p -> container.browser(scope, p.floor)?.let { p to it } }.toMap()
+        } else {
+            container.browser(scope)?.let { mapOf(Part.Files to it) }.orEmpty()
+        }
+        trash = if (parts.size > 1) container.browser(scope, TRASH) else null
+        show(Part.Files)
         // Asked once, here, rather than when the screen opens: whether the
         // server has SEARCH at all decides whether the bar offers it, and a
         // glyph that appeared a second after the listing did would be worse
@@ -201,6 +246,7 @@ private fun SignedIn(
     DisposableEffect(screen, browser) {
         back.onBack = when (screen) {
             is Screen.Browser -> browser?.let { { it.goUp() } } ?: { false }
+            is Screen.Trash -> { { trash?.goUp() == true || leave() } }
             else -> { { leave() } }
         }
         onDispose { back.onBack = null }
@@ -212,6 +258,9 @@ private fun SignedIn(
             backupSummary = oneLine(state.backupState),
             onServer = { go(Screen.Server) },
             onBackup = { go(Screen.Backup) },
+            // Listed again each time it is opened: what is in it changes with
+            // every delete made since.
+            onTrash = trash?.let { bin -> { bin.start(); go(Screen.Trash) } },
             reporting = state.reporting.takeIf { CrashReports.available },
             onReporting = { on -> scope.launch { signedIn.setReporting(on) } },
             onClose = { leave() },
@@ -258,6 +307,10 @@ private fun SignedIn(
                 },
                 onClose = { leave() },
             )
+        }
+
+        is Screen.Trash -> trash?.let { bin ->
+            BrowserScreen(bin, cast = null, onOpenSettings = { leave() }, onClose = { leave() })
         }
 
         is Screen.Search -> {
@@ -316,8 +369,41 @@ private fun SignedIn(
                     },
                     onEditServer = onEdit,
                     banner = { BackupStrip(state.backupState) { go(Screen.Backup) } },
+                    bottomBar = { if (parts.size > 1) Parts(part, ::show) },
+                    cover = { entry -> pictureOf(container, entry) },
+                    // Albums under an artist, and recordings under a month:
+                    // the two places the web draws a grid.
+                    tiles = { path -> depth(path, Part.Music.floor) == 1 || depth(path, Part.Videos.floor) == 2 },
                 )
             }
         }
     }
 }
+
+@Composable
+private fun Parts(current: Part, onSelect: (Part) -> Unit) {
+    NavigationBar {
+        Part.entries.forEach { p ->
+            NavigationBarItem(
+                selected = p == current,
+                onClick = { onSelect(p) },
+                // Cleared so that the label is the item's name: the same
+                // emoji is a row's mark and a menu's action elsewhere.
+                icon = { Text(p.glyph, Modifier.clearAndSetSemantics {}) },
+                label = { Text(p.label) },
+            )
+        }
+    }
+}
+
+/** An album's cover, or a recording's thumbnail; nothing for anything else. */
+private suspend fun pictureOf(container: AppContainer, entry: DavResource): ImageBitmap? {
+    val answer = when {
+        entry.isDirectory && depth(entry.path, Part.Music.floor) == 2 -> container.thumbnails.cover(entry.path, TILE_PIXELS)
+        !entry.isDirectory && depth(entry.path, Part.Videos.floor) == 3 -> container.thumbnails.of(entry.path, TILE_PIXELS)
+        else -> return null
+    }
+    return (answer as? Thumbnail.Picture)?.let { decodePicture(it.bytes) }
+}
+
+private const val TILE_PIXELS = 320

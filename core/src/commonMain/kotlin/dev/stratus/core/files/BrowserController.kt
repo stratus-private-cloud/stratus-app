@@ -34,6 +34,11 @@ class BrowserController(
     private val handoff: FileHandoff,
     private val scope: CoroutineScope,
     private val sharing: Sharing? = null,
+    /**
+     * The folder this browser cannot climb out of: `/` for the whole server,
+     * or a section's collection on a Stratus, such as `/music/`.
+     */
+    val floor: String = "/",
 ) {
     /** Whether there is anybody to share through, which the row menu asks. */
     val canShare: Boolean get() = sharing?.offered == true
@@ -56,7 +61,11 @@ class BrowserController(
         mutable.value = mutable.value.copy(busy = true, failure = null, pending = null)
         running = scope.launch {
             var path = mutable.value.path
-            if (path == "/" && dav.isStratusAtOrigin()) path = STRATUS_HOME
+            if (path == "/" && floor != "/") {
+                path = floor
+            } else if (path == "/" && dav.isStratusAtOrigin()) {
+                path = STRATUS_HOME
+            }
             mutable.value = mutable.value.copy(path = path)
             load(path)
         }
@@ -65,10 +74,10 @@ class BrowserController(
 
     fun enter(directory: DavResource) = go(directory.path)
 
-    /** True when there was somewhere to go. The root is the end of the line. */
+    /** True when there was somewhere to go. The floor is the end of the line. */
     fun goUp(): Boolean {
         val here = mutable.value.path.trimEnd('/')
-        if (here.isEmpty()) return false
+        if (here.isEmpty() || here == floor.trimEnd('/')) return false
         go(here.substringBeforeLast('/').ifEmpty { "" } + "/")
         return true
     }
@@ -221,8 +230,9 @@ class BrowserController(
 internal const val STRATUS_HOME = "/files/"
 
 /**
- * Whether this is a Stratus and the app is pointed at its origin. Pointed
- * anywhere below that, somebody chose where to be, and it is respected.
+ * Whether this is a Stratus and the app is pointed at its origin, which is
+ * when its collections can be told apart into sections. Pointed anywhere
+ * below that, somebody chose where to be, and it is respected.
  *
  * A server that cannot be asked is not a Stratus: whatever is shown next is
  * what reports it unreachable.

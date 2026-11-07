@@ -391,6 +391,16 @@ Three surfaces, and no more than three:
 2. **The file browser**, which is the main screen: walk the tree, open or
    download a file, rename it, delete it.
 
+   **On a Stratus it is split into sections**, the one place the app asks
+   which server it is talking to: `Stratus-Version` on an `OPTIONS` at the
+   origin, or `Server: Stratus/…` where a proxy left it alone -- Fly's
+   rewrites it and nginx hides it by default -- decided on 2026-11-07. Files, Music and Videos are each a
+   browser with a floor it cannot climb out of, behind a bar at the bottom,
+   and Trash is a row in the menu. Everything inside them is still WebDAV and
+   a `GET`, so this is a way of laying out a Stratus's collections rather than
+   a second API; against any other server, or a Stratus pointed below its
+   origin, there is one browser where it was pointed and no bar.
+
    **Its bar is the app's bar** (stratus-app#140): the mark and the word
    `Stratus` on the left, the menu on the right, and the same thing whatever
    folder is open -- which is the web UI's navbar, and deliberately. What was

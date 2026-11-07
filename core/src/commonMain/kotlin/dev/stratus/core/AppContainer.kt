@@ -14,6 +14,7 @@ import dev.stratus.core.dav.DavClient
 import dev.stratus.core.documents.DocumentRef
 import dev.stratus.core.documents.DocumentTree
 import dev.stratus.core.files.BrowserController
+import dev.stratus.core.files.isStratusAtOrigin
 import dev.stratus.core.files.FileHandoff
 import dev.stratus.core.files.SearchController
 import dev.stratus.core.media.Thumbnails
@@ -194,7 +195,13 @@ class AppContainer(
         DocumentTree(instances, connections, thumbnails, scope, changed)
 
     /** Null when nobody is signed in, which is the only state it can be built from. */
-    suspend fun browser(scope: CoroutineScope): BrowserController? {
+    /** Whether the server is a Stratus pointed at its origin, so the app can show its sections. */
+    suspend fun isStratusAtOrigin(): Boolean {
+        val instance = instances.instance() ?: return false
+        return connections.to(instance)?.dav?.isStratusAtOrigin() == true
+    }
+
+    suspend fun browser(scope: CoroutineScope, floor: String = "/"): BrowserController? {
         val instance = instances.instance() ?: return null
         val connection = connections.to(instance) ?: return null
         val credentials = instances.credentials() ?: return null
@@ -203,6 +210,7 @@ class AppContainer(
             handoff,
             scope,
             Sharing(ShareLinks(instance.baseUrl, credentials), sharing, linkSupportFor(instance)),
+            floor,
         )
     }
 

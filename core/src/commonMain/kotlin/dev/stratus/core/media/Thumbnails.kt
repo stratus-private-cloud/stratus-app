@@ -1,6 +1,7 @@
 package dev.stratus.core.media
 
 import dev.stratus.core.backup.Connections
+import dev.stratus.core.dav.DavPath
 import dev.stratus.core.server.ServerStore
 import dev.stratus.core.share.ShareLife
 import dev.stratus.core.share.ShareLinks
@@ -82,6 +83,19 @@ class Thumbnails(
             // shut while they did.
             left() ?: fetch(connection.http, url)
         }
+    }
+
+    /**
+     * An album's cover from a Stratus's music collection, where it hangs off
+     * the album's own address as `?cover=<pixels>` rather than being one of
+     * its files. Under the same permits and the same refusal as a thumbnail.
+     */
+    suspend fun cover(album: String, width: Int): Thumbnail {
+        left()?.let { return it }
+        val instance = instances.instance() ?: return Thumbnail.None
+        val connection = connections.to(instance) ?: return Thumbnail.None
+        val url = instance.baseUrl.trimEnd('/') + DavPath.encodePath(album.trimEnd('/')) + "/?cover=$width"
+        return slots.withPermit { left() ?: fetch(connection.http, url) }
     }
 
     private suspend fun fetch(http: HttpClient, url: String): Thumbnail = try {

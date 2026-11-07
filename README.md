@@ -235,11 +235,20 @@ the rest is a narrower word.
 
 ## Where the browser opens
 
-On a Stratus signed in at its origin, the browser opens on `files/` rather
-than on the list of collections, the same tree the web UI starts on. It knows
-by the `Stratus-Version` header of one `OPTIONS`, or `Server: Stratus/…` where
-no proxy has rewritten it. Signed in at any
-other address, or against any other server, it opens where it was pointed.
+On a Stratus signed in at its origin, the app is split the way the web UI is:
+a bar at the bottom moves between 📁 Files, 🎵 Music and 🎬 Videos, each a
+browser that stays inside its own collection, and 🗑️ Trash is in the ⚙️ menu
+beside Backup and Server. Music draws an artist's albums as a grid of covers,
+and Videos a month's recordings as a grid of thumbnails. It knows it is a
+Stratus by the `Stratus-Version` header of one `OPTIONS`, or `Server: Stratus/…`
+where no proxy has rewritten it.
+
+Signed in at any other address, or against any other server, there is one
+browser and it opens where it was pointed.
+
+What is not there yet: a track opens in another app or casts rather than
+playing here (stratus-app#180), and the trash can be looked through and copied
+out of but not restored from (stratus-app#179).
 
 ## Sharing
 

@@ -421,7 +421,7 @@ private fun Parts(current: Part, onSelect: (Part) -> Unit) {
 private suspend fun pictureOf(container: AppContainer, entry: DavResource): ImageBitmap? {
     val answer = when {
         entry.isDirectory && depth(entry.path, Part.Music.floor) == 2 -> container.thumbnails.cover(entry.path, TILE_PIXELS)
-        !entry.isDirectory && depth(entry.path, Part.Videos.floor) == 3 -> container.thumbnails.of(entry.path, TILE_PIXELS)
+        !entry.isDirectory && depth(entry.path, Part.Videos.floor) == 3 -> container.thumbnails.of(entry, TILE_PIXELS)
         else -> return null
     }
     return (answer as? Thumbnail.Picture)?.let { decodePicture(it.bytes) }

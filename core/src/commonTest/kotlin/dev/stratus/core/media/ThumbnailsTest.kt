@@ -3,6 +3,7 @@ package dev.stratus.core.media
 import dev.stratus.core.backup.Connection
 import dev.stratus.core.backup.Connections
 import dev.stratus.core.dav.DavClient
+import dev.stratus.core.dav.DavResource
 import dev.stratus.core.net.Credentials
 import dev.stratus.core.server.Server
 import dev.stratus.core.server.ServerStore
@@ -70,6 +71,16 @@ class ThumbnailsTest {
         // it -- so every picture in the picker was an icon (stratus-app#130).
         val token = seen.single().url.parameters["k"]
         assertEquals("${clock / 1000 + 86_400}", token?.split('.')?.get(4))
+    }
+
+    @Test
+    fun aFileInAGeneratedCollectionIsAskedForWhereItReallyIs() = runTest {
+        // A recording listed under /videos/ has no signable address there, so
+        // asking by its listed path sent nothing and every tile was blank.
+        val thumbs = thumbnails { HttpStatusCode.OK to "jpeg" }
+        val clip = DavResource("/videos/2026/10/clip.mp4", isDirectory = false, source = "/files/camera/clip.mp4")
+        assertIs<Thumbnail.Picture>(thumbs.of(clip, 96))
+        assertEquals("/thumb/camera/clip.mp4", seen.single().url.encodedPath)
     }
 
     @Test

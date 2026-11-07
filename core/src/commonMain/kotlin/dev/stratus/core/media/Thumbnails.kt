@@ -1,5 +1,6 @@
 package dev.stratus.core.media
 
+import dev.stratus.core.dav.DavResource
 import dev.stratus.core.backup.Connections
 import dev.stratus.core.dav.DavPath
 import dev.stratus.core.server.ServerStore
@@ -68,6 +69,13 @@ class Thumbnails(
     private val slots = Semaphore(atOnce)
     private val lock = Mutex()
     private var closedUntil = 0L
+
+    /**
+     * A listed file's picture, asked for where it really is: one in a
+     * generated collection -- `/videos/`, `/photos/` -- has a signable address
+     * only under `/files/`, which the listing gives as [DavResource.source].
+     */
+    suspend fun of(entry: DavResource, width: Int): Thumbnail = of(entry.source ?: entry.path, width)
 
     /** [path] is as WebDAV gives it, leading slash and all. */
     suspend fun of(path: String, width: Int): Thumbnail {

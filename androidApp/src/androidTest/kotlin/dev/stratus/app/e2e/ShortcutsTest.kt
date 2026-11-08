@@ -17,14 +17,15 @@ import kotlin.test.assertEquals
 class ShortcutsTest : E2E() {
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
-    private fun published() = context.getSystemService(ShortcutManager::class.java).dynamicShortcuts.map { it.id }
+    // A set: the system hands them back in an order of its own.
+    private fun published() = context.getSystemService(ShortcutManager::class.java).dynamicShortcuts.map { it.id }.toSet()
 
     @Test
     fun aStratusPutsItsPartsOnTheIcon() {
         launch()
         signIn()
         onTheBrowser()
-        ui.waitUntil(15_000) { published() == listOf("files", "music", "videos") }
+        ui.waitUntil(15_000) { published() == setOf("files", "music", "videos") }
 
         openServer()
         tap("Sign out")
@@ -35,7 +36,7 @@ class ShortcutsTest : E2E() {
         ui.onAllNodes(confirm)[buttons - 1].performClick()
         see("Server address")
         ui.waitUntil(15_000) { published().isEmpty() }
-        assertEquals(emptyList(), published())
+        assertEquals(emptySet(), published())
     }
 
     @Test

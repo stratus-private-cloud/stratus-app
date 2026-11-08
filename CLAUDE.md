@@ -1237,7 +1237,24 @@ information is in the app's dSYM, which CI uploads with
 one there is until #5. The organisation and project are the ids in the DSN, so
 the token is the one secret it needs.
 
-## The backup log
+## Play releases (stratus-app#89)
+
+**A Play listing became part of the plan on 2026-11-08** (stratus-app#90): a
+beta on the internal track, so testers update from the store. The README used
+to say it was not.
+
+**Two keys, kept apart on purpose.** The sideloading key signs the debug APK
+in every CI run; the upload key signs the release AAB and exists only in
+`release.yml`, a `workflow_dispatch` that never runs on a push (#91). Play
+re-signs with its own key, so the upload key can be replaced and the
+sideloading one never reaches a store.
+
+**The versionCode is the run number**, because Play refuses one it has seen
+and the run number only goes up. The workflow fails if the bundle is not
+signed by the upload key: without the secrets Gradle builds it unsigned rather
+than failing, and Play would only say so after a manual upload.
+
+
 
 A line per file into the platform's log, naming what went and how much is
 behind it (`BackupLog`, written from `BackupRun`). It exists for one question

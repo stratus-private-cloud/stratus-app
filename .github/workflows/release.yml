@@ -1,0 +1,62 @@
+name: Release
+
+# Run by hand, never on a push (stratus-app#91): what it makes is something Play
+# accepts, and every upload spends a versionCode for good.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    name: signed AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The run number only goes up, which is the one thing Play asks of a
+      # versionCode.
+      STRATUS_VERSION_CODE: ${{ github.run_number }}
+      STRATUS_VERSION: 0.1.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: docker/setup-buildx-action@v4.4.0
+
+      - uses: actions/cache@v6.1.0
+        with:
+          path: .cache/gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml', '**/*.gradle.kts') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - run: make doctor
+
+      - name: Build the toolchain image
+        run: make toolchain BUILD_CACHE="--cache-from type=gha --load"
+
+      - name: Build the bundle, signed with the upload key
+        run: make gradle ARGS=":androidApp:bundleRelease --stacktrace"
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          STRATUS_UPLOAD_KEYSTORE_BASE64: ${{ secrets.STRATUS_UPLOAD_KEYSTORE_BASE64 }}
+          STRATUS_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.STRATUS_UPLOAD_KEYSTORE_PASSWORD }}
+
+      # Without the secrets Gradle builds the bundle unsigned rather than
+      # failing, and Play would refuse it only after somebody downloaded and
+      # uploaded it by hand.
+      - name: Check it is signed with the upload key
+        run: |
+          aab=androidApp/build/outputs/bundle/release/androidApp-release.aab
+          jarsigner -verify "$aab"
+          keytool -printcert -jarfile "$aab" | grep -q "CN=Stratus upload"
+          cp "$aab" "stratus-$STRATUS_VERSION.aab"
+
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: stratus-${{ env.STRATUS_VERSION }}-aab
+          path: stratus-${{ env.STRATUS_VERSION }}.aab
+          if-no-files-found: error

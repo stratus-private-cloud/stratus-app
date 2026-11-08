@@ -19,6 +19,18 @@ plugins {
 private val keystoreBase64 = providers.environmentVariable("STRATUS_KEYSTORE_BASE64")
 private val keystorePassword = providers.environmentVariable("STRATUS_KEYSTORE_PASSWORD")
 
+// The Play upload key, a second one on purpose: the sideloading key is in every
+// CI run, and this one only in the release workflow (stratus-app#91). Play
+// re-signs what it is given with a key of its own, so losing this one is a
+// reset requested from Google rather than the end of the listing.
+private val uploadKeystoreBase64 = providers.environmentVariable("STRATUS_UPLOAD_KEYSTORE_BASE64")
+private val uploadKeystorePassword = providers.environmentVariable("STRATUS_UPLOAD_KEYSTORE_PASSWORD")
+
+// Play refuses a versionCode it has seen, so the release workflow hands in its
+// run number; anything else builds as 1.
+private val releaseVersionCode = providers.environmentVariable("STRATUS_VERSION_CODE")
+private val releaseVersionName = providers.environmentVariable("STRATUS_VERSION")
+
 android {
     namespace = "dev.stratus.app"
     compileSdk = 36
@@ -27,8 +39,8 @@ android {
         applicationId = "dev.stratus.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = releaseVersionCode.orNull?.toInt() ?: 1
+        versionName = releaseVersionName.orNull ?: "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Every test starts from an app that has never run: no instance, no
@@ -64,6 +76,20 @@ android {
             keyPassword = keystorePassword.get()
         }
         buildTypes.getByName("debug").signingConfig = signingConfigs.getByName("sideloaded")
+    }
+
+    if (uploadKeystoreBase64.isPresent && uploadKeystorePassword.isPresent) {
+        val keystore = layout.buildDirectory.file("signing/upload.jks").get().asFile
+        keystore.parentFile.mkdirs()
+        keystore.writeBytes(Base64.getDecoder().decode(uploadKeystoreBase64.get()))
+
+        signingConfigs.create("upload") {
+            storeFile = keystore
+            storePassword = uploadKeystorePassword.get()
+            keyAlias = "upload"
+            keyPassword = uploadKeystorePassword.get()
+        }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("upload")
     }
 }
 

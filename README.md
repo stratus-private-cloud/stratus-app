@@ -413,8 +413,25 @@ other and keep your session and your cache. A build made anywhere else -- a
 fork, or your own laptop -- is signed with a throwaway debug key instead and
 will not install over ours.
 
-That key is for sideloading and nothing else. Stable releases, if there are
-ever any, get a key of their own and a Play listing is not part of the plan.
+That key is for sideloading and nothing else. Google Play gets a key of its
+own; see below.
+
+## Google Play
+
+The app is going on Google Play as a beta first, on the internal testing
+track, so testers get updates from the store instead of sideloading
+(stratus-app#89).
+
+A Play build is made by hand: run the **Release** workflow from
+[Actions](https://github.com/stratus-private-cloud/stratus-app/actions/workflows/release.yml).
+It builds a release AAB, signs it with the upload key and attaches it to the
+run. The version code is the run number and the version name is
+`0.1.<run number>`, so every run can be uploaded once and only once.
+
+The upload key is a repository secret, `STRATUS_UPLOAD_KEYSTORE_BASE64`, with
+its password in `STRATUS_UPLOAD_KEYSTORE_PASSWORD`. It is not the key users
+see: Play signs what reaches phones with a key of its own, so a lost upload
+key is a reset requested from Google.
 
 ## What cannot be promised on Android
 

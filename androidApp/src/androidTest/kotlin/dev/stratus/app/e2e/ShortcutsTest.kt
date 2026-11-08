@@ -25,7 +25,7 @@ class ShortcutsTest : E2E() {
         launch()
         signIn()
         onTheBrowser()
-        ui.waitUntil(15_000) { published() == setOf("files", "music", "videos") }
+        ui.waitUntil(15_000) { published() == setOf("files", "photos", "music", "videos") }
 
         openServer()
         tap("Sign out")

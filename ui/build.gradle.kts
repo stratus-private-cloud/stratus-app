@@ -1,3 +1,6 @@
+// `java` inside a Gradle block is Gradle's own extension, not the package.
+import java.util.Base64
+
 // The Sentry project crash reports go to, from the build's environment and
 // never from the source: a fork builds with none, and then the app has no
 // reporting and no switch offering it, rather than reporting to us.
@@ -59,7 +62,7 @@ val generateSymbolsFont by tasks.registering {
     inputs.file(font)
     outputs.dir(out)
     doLast {
-        val encoded = java.util.Base64.getEncoder().encodeToString(font.asFile.readBytes())
+        val encoded = Base64.getEncoder().encodeToString(font.asFile.readBytes())
         val file = out.get().file("dev/stratus/ui/SymbolsFont.kt").asFile
         file.parentFile.mkdirs()
         file.writeText("package dev.stratus.ui\n\ninternal const val SYMBOLS_FONT = \"$encoded\"\n")

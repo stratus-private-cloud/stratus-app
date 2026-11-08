@@ -49,9 +49,10 @@ object Glyph {
     const val RENAME = EDIT
     const val DELETE = "\uE92E"
 
-    // The sections a Stratus is split into: its tree, its two generated
+    // The sections a Stratus is split into: its tree, its three generated
     // libraries, and the trash, which lives in the menu.
     const val FILES = FOLDER
+    const val PHOTOS = PHOTO
     const val MUSIC = TRACK
     const val VIDEOS = FILM
     const val TRASH = DELETE

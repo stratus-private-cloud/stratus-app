@@ -244,11 +244,12 @@ the rest is a narrower word.
 ## Where the browser opens
 
 On a Stratus signed in at its origin, the app is split the way the web UI is:
-a bar at the bottom moves between Files, Music and Videos, each a browser
-that stays inside its own collection, and Trash is in the settings menu
-beside Backup and Server. On Android the same three are on the app icon's
-long press, as the web app's are. Music draws an artist's albums as a grid of covers,
-and Videos a month's recordings as a grid of thumbnails. It knows it is a
+a bar at the bottom moves between Files, Photos, Music and Videos, each a
+browser that stays inside its own collection, and Trash is in the settings
+menu beside Backup and Server. On Android the same four are on the app icon's
+long press, as the web app's are. Music draws an artist's albums as a grid of
+covers, and Photos and Videos a month as a grid of thumbnails; tapping a
+photograph opens it in the phone's own viewer. It knows it is a
 Stratus by the `Stratus-Version` header of one `OPTIONS`, or `Server: Stratus/…`
 where no proxy has rewritten it.
 

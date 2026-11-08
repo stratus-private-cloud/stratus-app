@@ -68,6 +68,7 @@ private sealed interface Screen {
  */
 private enum class Part(val glyph: String, val label: String, val floor: String) {
     Files(Glyph.FILES, "Files", "/files/"),
+    Photos(Glyph.PHOTOS, "Photos", "/photos/"),
     Music(Glyph.MUSIC, "Music", "/music/"),
     Videos(Glyph.VIDEOS, "Videos", "/videos/"),
 }
@@ -412,9 +413,13 @@ private fun SignedIn(
                     videos = videos,
                     playOnTap = part == Part.Music || part == Part.Videos,
                     cover = { entry -> pictureOf(container, entry) },
-                    // Albums under an artist, and recordings under a month:
-                    // the two places the web draws a grid.
-                    tiles = { path -> depth(path, Part.Music.floor) == 1 || depth(path, Part.Videos.floor) == 2 },
+                    // Albums under an artist, and photographs and recordings
+                    // under a month: the places the web draws a grid.
+                    tiles = { path ->
+                        depth(path, Part.Music.floor) == 1 ||
+                            depth(path, Part.Photos.floor) == 2 ||
+                            depth(path, Part.Videos.floor) == 2
+                    },
                 )
             }
         }
@@ -437,10 +442,11 @@ private fun Parts(current: Part, onSelect: (Part) -> Unit) {
     }
 }
 
-/** An album's cover, or a recording's thumbnail; nothing for anything else. */
+/** An album's cover, or a photograph's or a recording's thumbnail; nothing for anything else. */
 private suspend fun pictureOf(container: AppContainer, entry: DavResource): ImageBitmap? {
     val answer = when {
         entry.isDirectory && depth(entry.path, Part.Music.floor) == 2 -> container.thumbnails.cover(entry.path, TILE_PIXELS)
+        !entry.isDirectory && depth(entry.path, Part.Photos.floor) == 3 -> container.thumbnails.of(entry, TILE_PIXELS)
         !entry.isDirectory && depth(entry.path, Part.Videos.floor) == 3 -> container.thumbnails.of(entry, TILE_PIXELS)
         else -> return null
     }

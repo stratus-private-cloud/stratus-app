@@ -394,7 +394,7 @@ Three surfaces, and no more than three:
    **On a Stratus it is split into sections**, the one place the app asks
    which server it is talking to: `Stratus-Version` on an `OPTIONS` at the
    origin, or `Server: Stratus/…` where a proxy left it alone -- Fly's
-   rewrites it and nginx hides it by default -- decided on 2026-11-07. Files, Music and Videos are each a
+   rewrites it and nginx hides it by default -- decided on 2026-11-07. Files, Photos, Music and Videos are each a
    browser with a floor it cannot climb out of, behind a bar at the bottom,
    and Trash is a row in the menu. Everything inside them is still WebDAV and
    a `GET`, so this is a way of laying out a Stratus's collections rather than

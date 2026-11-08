@@ -12,6 +12,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.stratus.core.signin.PlaintextReason
@@ -48,6 +50,7 @@ fun SignInScreen(
     var username by remember(initial) { mutableStateOf(initial?.username ?: "") }
     var password by remember(initial) { mutableStateOf(initial?.password ?: "") }
     val busy = state is SignInState.Probing
+    val uris = LocalUriHandler.current
 
     Column(
         // Scrollable and padded for the keyboard: three fields and a button fit
@@ -59,6 +62,27 @@ fun SignInScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(if (initial != null) "Edit server" else "Sign in to your server")
+        if (initial == null) {
+            Text(
+                "Stratus backs up to a WebDAV server you run: a Stratus server, " +
+                    "Nextcloud or any other. Type its address, user name and password.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { uris.openUri(PROJECT) }, enabled = !busy) { Text("About Stratus") }
+                // Somebody with no server yet, and a store reviewer, can see the
+                // app work before deciding anything. It holds nothing of theirs.
+                TextButton(
+                    onClick = {
+                        address = DEMO_ADDRESS
+                        username = DEMO_USERNAME
+                        password = DEMO_PASSWORD
+                    },
+                    enabled = !busy,
+                ) { Text("Try the demo") }
+            }
+        }
 
         OutlinedTextField(
             value = address,
@@ -100,6 +124,13 @@ fun SignInScreen(
 
         if (busy) CircularProgressIndicator()
         if (state is SignInState.Failed) Text(explain(state.reason))
+        if (initial == null && address == DEMO_ADDRESS) {
+            Text(
+                "The demo is open to anyone and emptied every hour. Do not back up anything of yours to it.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 
     if (state is SignInState.Asking) {
@@ -133,6 +164,14 @@ fun SignInScreen(
         }
     }
 }
+
+private const val PROJECT = "https://stratus-private-cloud.github.io/"
+
+// The public demo (stratus-backend#492 fixed its password so this can be
+// written down).
+private const val DEMO_ADDRESS = "stratus-demo.dropdatabase.es"
+private const val DEMO_USERNAME = "demo"
+private const val DEMO_PASSWORD = "stratus-private-cloud"
 
 private fun certificateWarning(question: Question.AcceptCertificate): String =
     "${question.hostPort} presented a certificate no authority on this device " +

@@ -18,6 +18,14 @@ private to Stratus.
 > describe what it is meant to be; this warning shrinks as that stops being
 > aspirational.
 
+## Trying it
+
+The sign-in screen has **Try the demo**, which fills in the public Stratus demo
+(`stratus-demo.dropdatabase.es`, `demo` / `stratus-private-cloud`). It is open
+to anybody and emptied every hour, so it is for looking around and never for a
+backup. Nothing is backed up until folders are chosen, so signing in to it
+sends nothing.
+
 ## Why it exists
 
 Automatic camera-roll backup is the thinnest part of Stratus, and on Android it

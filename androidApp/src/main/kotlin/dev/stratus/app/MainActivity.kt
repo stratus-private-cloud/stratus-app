@@ -3,6 +3,10 @@ package dev.stratus.app
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.BitmapFactory
+import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -18,8 +22,11 @@ import dev.stratus.core.backup.BackupWorker
 import dev.stratus.core.session.Ask
 import dev.stratus.ui.App
 import dev.stratus.ui.BackRequests
+import dev.stratus.ui.Shortcuts
 
 class MainActivity : ComponentActivity() {
+
+    private val shortcuts = Shortcuts()
 
     private val photos by lazy { AndroidAssetSource(applicationContext).permissions() }
 
@@ -63,6 +70,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val container = appContainer(applicationContext)
         val back = BackRequests()
+        shortcuts.opened.value = intent.getStringExtra(PART)
+        shortcuts.offer = ::publish
 
         // Compose Multiplatform has no common BackHandler at the version this
         // project is pinned to, so the system gesture is wired here. Walking up
@@ -84,7 +93,42 @@ class MainActivity : ComponentActivity() {
                 back,
                 onBackUpNow = { BackupWorker.now(applicationContext) },
                 onAsk = { asks -> askFor.launch(permissionsFor(asks)) },
+                shortcuts = shortcuts,
             )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getStringExtra(PART)?.let { shortcuts.opened.value = it }
+    }
+
+    /**
+     * The long-press menu on the launcher icon, the PWA's shortcuts again
+     * with its icons: dynamic rather than declared in XML, because only a
+     * Stratus has parts and a static one would open nothing anywhere else.
+     */
+    private fun publish(sections: List<Shortcuts.Section>) {
+        val manager = getSystemService(ShortcutManager::class.java) ?: return
+        val shortcuts = sections.mapNotNull { section ->
+            val icon = SHORTCUT_ICONS[section.id] ?: return@mapNotNull null
+            ShortcutInfo.Builder(this, section.id)
+                .setShortLabel(section.label)
+                // Full bleed with the glyph in the middle half, so the
+                // launcher's mask crops only the gradient.
+                .setIcon(Icon.createWithAdaptiveBitmap(BitmapFactory.decodeResource(resources, icon)))
+                .setIntent(Intent(Intent.ACTION_VIEW, null, this, MainActivity::class.java).putExtra(PART, section.id))
+                .build()
+        }
+        manager.dynamicShortcuts = shortcuts
+    }
+
+    private companion object {
+        const val PART = "dev.stratus.app.PART"
+        val SHORTCUT_ICONS = mapOf(
+            "files" to R.drawable.shortcut_files,
+            "music" to R.drawable.shortcut_music,
+            "videos" to R.drawable.shortcut_videos,
+        )
     }
 }

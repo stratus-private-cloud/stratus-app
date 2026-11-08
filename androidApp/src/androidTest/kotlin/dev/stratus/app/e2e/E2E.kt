@@ -1,5 +1,6 @@
 package dev.stratus.app.e2e
 
+import android.content.Intent
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasClickAction
@@ -95,6 +96,11 @@ abstract class E2E {
 
     fun launch() {
         scenario = ActivityScenario.launch(MainActivity::class.java)
+    }
+
+    /** As a launcher shortcut does: the activity, with what the shortcut put on it. */
+    fun launch(intent: Intent) {
+        scenario = ActivityScenario.launch(intent)
     }
 
     @After

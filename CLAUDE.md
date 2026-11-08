@@ -1214,6 +1214,18 @@ embedAndSign task, and this app links the framework Gradle built, so it would
 be missing on a phone and nowhere else. Android cannot load a font from bytes,
 so its half writes them to the cache directory first.
 
+## The launcher icon's menu
+
+**A Stratus's parts are on the icon's long press on Android**, the shortcuts
+the web app's manifest already offers (stratus-backend#311) with the same
+icons. Dynamic rather than declared in `shortcuts.xml`, because only a
+Stratus at its origin has parts: they are published once the server has said
+so and withdrawn when the signed-in screen goes. `Shortcuts` is the seam --
+the platform hands in the part it was opened at, and the app tells it which
+parts there are. A part asked for before the server has answered is held
+until it has, which is the cold start from a shortcut. iOS quick actions are
+not built (stratus-app#199).
+
 ## Crash reports
 
 **Sentry's Kotlin Multiplatform SDK, off until somebody switches it on**

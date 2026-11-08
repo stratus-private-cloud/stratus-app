@@ -87,6 +87,7 @@ fun App(
     onBackUpNow: (() -> Unit)? = null,
     /** Asks the system for these permissions, in one request; null where nothing can ask yet. */
     onAsk: ((Set<Ask>) -> Unit)? = null,
+    shortcuts: Shortcuts = Shortcuts(),
 ) {
     // Pinned to the main thread rather than left on the composition's own
     // dispatcher. A controller publishes state a screen reads, and a snapshot
@@ -125,6 +126,7 @@ fun App(
                     back = back,
                     onBackUpNow = onBackUpNow,
                     onAsk = onAsk,
+                    shortcuts = shortcuts,
                     baseUrl = current.baseUrl,
                     onEdit = { scope.launch { signIn.edit() } },
                     onInstancesChanged = { signIn.restore() },
@@ -156,6 +158,7 @@ private fun SignedIn(
     back: BackRequests,
     onBackUpNow: (() -> Unit)?,
     onAsk: ((Set<Ask>) -> Unit)?,
+    shortcuts: Shortcuts,
     baseUrl: String,
     onEdit: () -> Unit,
     onInstancesChanged: suspend () -> Unit,
@@ -203,10 +206,26 @@ private fun SignedIn(
 
     LaunchedEffect(Unit) { signedIn.start() }
 
+    // The part a shortcut asked for, taken once it can be shown. Opened from
+    // the launcher the app arrives before the server has said which parts it
+    // has, so the set-up below asks too, after it has.
+    fun takeOpened(): Part? {
+        val wanted = Part.entries.firstOrNull { it.name.lowercase() == shortcuts.opened.value } ?: return null
+        if (wanted !in parts) return null
+        shortcuts.opened.value = null
+        return wanted
+    }
+    val opened by shortcuts.opened.collectAsState()
+    LaunchedEffect(opened) { takeOpened()?.let(::show) }
+
     // Rebuilt when the server changes, and only then -- which excludes the
     // moment before the controller has read it: built then as well, the root
     // was listed twice on every sign-in and redrawn under the finger of
     // whoever tapped first.
+    // Taken away when this screen goes, which is signing out and editing the
+    // server alike: either way the parts are not known until it comes back.
+    DisposableEffect(Unit) { onDispose { shortcuts.offer(emptyList()) } }
+
     LaunchedEffect(baseUrl, state.server) {
         if (state.server == null) return@LaunchedEffect
         listed.clear()
@@ -217,7 +236,8 @@ private fun SignedIn(
             container.browser(scope)?.let { mapOf(Part.Files to it) }.orEmpty()
         }
         trash = if (parts.size > 1) container.browser(scope, TRASH) else null
-        show(Part.Files)
+        show(takeOpened() ?: Part.Files)
+        shortcuts.offer(if (parts.size > 1) parts.keys.map { Shortcuts.Section(it.name.lowercase(), it.label) } else emptyList())
         // Asked once, here, rather than when the screen opens: whether the
         // server has SEARCH at all decides whether the bar offers it, and a
         // glyph that appeared a second after the listing did would be worse

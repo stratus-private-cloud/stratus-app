@@ -59,12 +59,14 @@ object Glyph {
     const val VIDEOS = FILM
     const val TRASH = DELETE
 
-    // The player's buttons.
-    const val PLAY = "▶️"
-    const val PAUSE = "⏸️"
-    const val NEXT = "⏭️"
-    const val PREVIOUS = "⏮️"
-    const val STOP = "⏹️"
+    // The player's buttons, asked for as text rather than emoji (U+FE0E):
+    // a control is drawn in the theme's colour, like [BACK], and not as a
+    // coloured key.
+    const val PLAY = "\u25B6\uFE0E"
+    const val PAUSE = "\u23F8\uFE0E"
+    const val NEXT = "\u23ED\uFE0E"
+    const val PREVIOUS = "\u23EE\uFE0E"
+    const val STOP = "\u23F9\uFE0E"
 
     const val BACK = "←"
     const val MORE = "›"

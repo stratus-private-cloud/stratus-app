@@ -206,16 +206,17 @@ private fun SignedIn(
 
     LaunchedEffect(Unit) { signedIn.start() }
 
-    // Keyed on the parts as well: a shortcut that opened the app arrives
-    // before the server has said which parts it has.
-    val opened by shortcuts.opened.collectAsState()
-    LaunchedEffect(opened, parts) {
-        val wanted = Part.entries.firstOrNull { it.name.lowercase() == opened } ?: return@LaunchedEffect
-        if (wanted in parts) {
-            show(wanted)
-            shortcuts.opened.value = null
-        }
+    // The part a shortcut asked for, taken once it can be shown. Opened from
+    // the launcher the app arrives before the server has said which parts it
+    // has, so the set-up below asks too, after it has.
+    fun takeOpened(): Part? {
+        val wanted = Part.entries.firstOrNull { it.name.lowercase() == shortcuts.opened.value } ?: return null
+        if (wanted !in parts) return null
+        shortcuts.opened.value = null
+        return wanted
     }
+    val opened by shortcuts.opened.collectAsState()
+    LaunchedEffect(opened) { takeOpened()?.let(::show) }
 
     // Rebuilt when the server changes, and only then -- which excludes the
     // moment before the controller has read it: built then as well, the root
@@ -235,7 +236,7 @@ private fun SignedIn(
             container.browser(scope)?.let { mapOf(Part.Files to it) }.orEmpty()
         }
         trash = if (parts.size > 1) container.browser(scope, TRASH) else null
-        show(Part.Files)
+        show(takeOpened() ?: Part.Files)
         shortcuts.offer(if (parts.size > 1) parts.keys.map { Shortcuts.Section(it.name.lowercase(), it.label) } else emptyList())
         // Asked once, here, rather than when the screen opens: whether the
         // server has SEARCH at all decides whether the bar offers it, and a

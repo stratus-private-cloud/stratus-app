@@ -10,6 +10,7 @@ import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -110,7 +111,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun publish(sections: List<Shortcuts.Section>) {
         val manager = getSystemService(ShortcutManager::class.java) ?: return
-        manager.dynamicShortcuts = sections.mapNotNull { section ->
+        val shortcuts = sections.mapNotNull { section ->
             val icon = SHORTCUT_ICONS[section.id] ?: return@mapNotNull null
             ShortcutInfo.Builder(this, section.id)
                 .setShortLabel(section.label)
@@ -120,10 +121,13 @@ class MainActivity : ComponentActivity() {
                 .setIntent(Intent(Intent.ACTION_VIEW, null, this, MainActivity::class.java).putExtra(PART, section.id))
                 .build()
         }
+        val taken = manager.setDynamicShortcuts(shortcuts)
+        Log.i(TAG, "shortcuts ${shortcuts.map { it.id }}: taken=$taken, now ${manager.dynamicShortcuts.map { it.id }}")
     }
 
     private companion object {
         const val PART = "dev.stratus.app.PART"
+        const val TAG = "Shortcuts"
         val SHORTCUT_ICONS = mapOf(
             "files" to R.drawable.shortcut_files,
             "music" to R.drawable.shortcut_music,

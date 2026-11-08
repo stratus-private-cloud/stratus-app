@@ -23,6 +23,7 @@ import dev.stratus.core.backup.MediaAccess
 import dev.stratus.core.backup.MediaSource
 import dev.stratus.ui.Footnote
 import dev.stratus.ui.Glyph
+import dev.stratus.ui.Symbol
 import dev.stratus.ui.Page
 
 /**
@@ -102,7 +103,7 @@ fun SourcesScreen(
                 items(available, key = { it.id }) { source ->
                     val ticked = source.id in picked
                     ListItem(
-                        leadingContent = { Text(Glyph.FOLDERS) },
+                        leadingContent = { Symbol(Glyph.FOLDERS) },
                         headlineContent = { Text(source.label) },
                         supportingContent = { Text("${source.count} photographs") },
                         trailingContent = { Checkbox(checked = ticked, onCheckedChange = null) },

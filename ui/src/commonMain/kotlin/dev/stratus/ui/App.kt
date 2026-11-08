@@ -409,8 +409,8 @@ private fun Parts(current: Part, onSelect: (Part) -> Unit) {
                 selected = p == current,
                 onClick = { onSelect(p) },
                 // Cleared so that the label is the item's name: the same
-                // emoji is a row's mark and a menu's action elsewhere.
-                icon = { Text(p.glyph, Modifier.clearAndSetSemantics {}) },
+                // mark is a row's mark and a menu's action elsewhere.
+                icon = { Symbol(p.glyph, Modifier.clearAndSetSemantics {}) },
                 label = { Text(p.label) },
             )
         }

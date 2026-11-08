@@ -48,7 +48,7 @@ fun Page(
                 title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Text(Glyph.BACK, style = MaterialTheme.typography.titleLarge)
+                        Symbol(Glyph.BACK)
                     }
                 },
                 actions = actions,
@@ -92,10 +92,10 @@ fun Footnote(text: String) {
 @Composable
 fun NavRow(glyph: String, title: String, detail: String? = null, onClick: () -> Unit) {
     ListItem(
-        leadingContent = { Text(glyph) },
+        leadingContent = { Symbol(glyph) },
         headlineContent = { Text(title) },
         supportingContent = detail?.let { { Text(it) } },
-        trailingContent = { Text(Glyph.MORE, style = MaterialTheme.typography.titleLarge) },
+        trailingContent = { Symbol(Glyph.MORE) },
         modifier = Modifier.clickable(onClick = onClick),
     )
 }
@@ -104,7 +104,7 @@ fun NavRow(glyph: String, title: String, detail: String? = null, onClick: () -> 
 @Composable
 fun ActionRow(glyph: String, title: String, detail: String? = null, onClick: () -> Unit) {
     ListItem(
-        leadingContent = { Text(glyph) },
+        leadingContent = { Symbol(glyph) },
         headlineContent = { Text(title) },
         supportingContent = detail?.let { { Text(it) } },
         modifier = Modifier.clickable(onClick = onClick),
@@ -121,7 +121,7 @@ fun ActionRow(glyph: String, title: String, detail: String? = null, onClick: () 
 @Composable
 fun SwitchRow(glyph: String, title: String, detail: String? = null, checked: Boolean, onChange: (Boolean) -> Unit) {
     ListItem(
-        leadingContent = { Text(glyph) },
+        leadingContent = { Symbol(glyph) },
         headlineContent = { Text(title) },
         supportingContent = detail?.let { { Text(it) } },
         trailingContent = { Switch(checked = checked, onCheckedChange = null) },
@@ -133,7 +133,7 @@ fun SwitchRow(glyph: String, title: String, detail: String? = null, checked: Boo
 @Composable
 fun FactRow(glyph: String, title: String, detail: String) {
     ListItem(
-        leadingContent = { Text(glyph) },
+        leadingContent = { Symbol(glyph) },
         headlineContent = { Text(title) },
         supportingContent = { Text(detail) },
     )

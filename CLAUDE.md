@@ -1202,6 +1202,18 @@ blob in an ordinary file. "Never in ordinary preferences" is satisfied in
 substance, since the file holds ciphertext undecryptable without a key the app
 cannot export, but not in letter.
 
+## Marks (stratus-app#195)
+
+**Every mark is a character of a Material Symbols subset**, drawn by
+`Symbol`. They were emoji, which changed look with the phone's maker and were
+coloured pictures beside controls that wanted the theme's colour. The font is
+cut to the glyphs `ui/symbols/names.txt` names by `scripts/symbols.sh`, about
+six kilobytes, and **reaches the app as a generated Kotlin constant rather
+than a Compose resource**: a resource gets into an iOS bundle through Xcode's
+embedAndSign task, and this app links the framework Gradle built, so it would
+be missing on a phone and nowhere else. Android cannot load a font from bytes,
+so its half writes them to the cache directory first.
+
 ## Crash reports
 
 **Sentry's Kotlin Multiplatform SDK, off until somebody switches it on**

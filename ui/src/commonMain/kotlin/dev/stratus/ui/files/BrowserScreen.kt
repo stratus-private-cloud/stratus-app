@@ -68,6 +68,7 @@ import dev.stratus.core.play.MusicController
 import dev.stratus.core.play.VideoController
 import dev.stratus.core.share.ShareLife
 import dev.stratus.ui.Glyph
+import dev.stratus.ui.Symbol
 import dev.stratus.ui.StratusMark
 import dev.stratus.ui.decodePicture
 
@@ -118,7 +119,7 @@ fun BrowserScreen(
             TopAppBar(
                 navigationIcon = {
                     if (onClose != null) {
-                        IconButton(onClick = onClose) { Text(Glyph.BACK, style = MaterialTheme.typography.titleLarge) }
+                        IconButton(onClick = onClose) { Symbol(Glyph.BACK) }
                     }
                 },
                 title = {
@@ -130,9 +131,9 @@ fun BrowserScreen(
                 },
                 actions = {
                     if (onSearch != null) {
-                        IconButton(onClick = onSearch) { Text(Glyph.SEARCH) }
+                        IconButton(onClick = onSearch) { Symbol(Glyph.SEARCH) }
                     }
-                    IconButton(onClick = onOpenSettings) { Text(Glyph.SETTINGS) }
+                    IconButton(onClick = onOpenSettings) { Symbol(Glyph.SETTINGS) }
                 },
             )
         },
@@ -220,7 +221,7 @@ private fun Where(path: String, floor: String, up: () -> Unit) {
     ) {
         if (!top) {
             IconButton(onClick = up) {
-                Text(Glyph.BACK, style = MaterialTheme.typography.titleLarge)
+                Symbol(Glyph.BACK)
             }
         }
         Text(
@@ -261,7 +262,7 @@ private fun Tile(
             if (shown != null) {
                 Image(shown, contentDescription = null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } else {
-                Text(markOf(entry), style = MaterialTheme.typography.displaySmall, modifier = Modifier.clearAndSetSemantics {})
+                Symbol(markOf(entry), Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.displaySmall)
             }
         }
         Text(entry.name, Modifier.padding(top = 6.dp), maxLines = 2, style = MaterialTheme.typography.bodyMedium)
@@ -294,20 +295,19 @@ internal fun Entry(
     // gear on the right. Tapping and holding the row still open the same menu,
     // since the gear is a small target and the row is the whole width.
     ListItem(
-        leadingContent = { Text(markOf(entry), style = MaterialTheme.typography.titleLarge) },
+        leadingContent = { Symbol(markOf(entry)) },
         headlineContent = { Text(entry.name) },
         supportingContent = { Text(if (entry.isDirectory) "Folder" else describe(entry)) },
         trailingContent = {
-            // Anchored to the gear rather than the row, so the menu opens
+            // Anchored to the button rather than the row, so the menu opens
             // where the finger is, as the web's opens under its button.
             Box {
-                // The gear is named by its description and not by its text:
-                // the bar's Settings is the same emoji, and that one is the
-                // button a test or a screen reader finds by "⚙️".
+                // Named by its description and not by its text, which is a
+                // private-use character nobody can read out.
                 IconButton(
                     onClick = { menuOpen = true },
                     modifier = Modifier.semantics { contentDescription = "Actions on ${entry.name}" },
-                ) { Text(Glyph.ACTIONS, Modifier.clearAndSetSemantics {}) }
+                ) { Symbol(Glyph.ACTIONS, Modifier.clearAndSetSemantics {}) }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     Actions(entry, controller, cast, onPlay, close = { menuOpen = false })
                 }
@@ -354,12 +354,12 @@ private fun Actions(
     Action(Glyph.DELETE, "Delete", danger = true) { close(); controller.ask(Confirmation.Delete(entry)) }
 }
 
-/** A menu line: the emoji, then the words, which are what a test and a screen reader go by. */
+/** A menu line: the mark, then the words, which are what a test and a screen reader go by. */
 @Composable
 private fun Action(glyph: String, label: String, danger: Boolean = false, onClick: () -> Unit) {
     val colour = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
     DropdownMenuItem(
-        leadingIcon = { Text(glyph, Modifier.clearAndSetSemantics {}) },
+        leadingIcon = { Symbol(glyph, Modifier.clearAndSetSemantics {}, color = colour) },
         text = { Text(label, color = colour) },
         onClick = onClick,
     )
@@ -579,7 +579,7 @@ private fun ScreenName(cast: CastController, device: CastDevice) {
             if (drawn != null) {
                 Image(drawn, contentDescription = null, modifier = Modifier.size(32.dp))
             } else {
-                Text(Glyph.SCREEN, style = MaterialTheme.typography.titleLarge)
+                Symbol(Glyph.SCREEN)
             }
         }
         Spacer(Modifier.width(12.dp))

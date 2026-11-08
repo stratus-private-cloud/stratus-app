@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.stratus.core.play.MusicController
 import dev.stratus.ui.Glyph
+import dev.stratus.ui.Symbol
 import kotlinx.coroutines.delay
 
 /**
@@ -73,10 +74,10 @@ fun MiniPlayer(music: MusicController) {
     }
 }
 
-/** Named by its word and not its emoji, which a row's menu also draws. */
+/** Named by its word and not its mark, which a row's menu also draws. */
 @Composable
 private fun Button(glyph: String, label: String, onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = label }) {
-        Text(glyph, Modifier.clearAndSetSemantics {})
+        Symbol(glyph, Modifier.clearAndSetSemantics {})
     }
 }

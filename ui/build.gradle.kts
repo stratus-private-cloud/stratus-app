@@ -46,6 +46,26 @@ val generateBuildStamp by tasks.registering {
     }
 }
 
+// The Material Symbols subset (stratus-app#195), as a Kotlin constant. Not a
+// Compose resource: those reach an iOS bundle through Xcode's
+// embedAndSignAppleFrameworkForXcode, and this app links the framework Gradle
+// built instead (iosApp/project.yml), so a resource would be missing at run
+// time and only on a phone. Six kilobytes of base64 in the binary is nothing.
+val symbolsFont = layout.projectDirectory.file("symbols/MaterialSymbols.ttf")
+
+val generateSymbolsFont by tasks.registering {
+    val font = symbolsFont
+    val out = layout.buildDirectory.dir("generated/symbols/kotlin")
+    inputs.file(font)
+    outputs.dir(out)
+    doLast {
+        val encoded = java.util.Base64.getEncoder().encodeToString(font.asFile.readBytes())
+        val file = out.get().file("dev/stratus/ui/SymbolsFont.kt").asFile
+        file.parentFile.mkdirs()
+        file.writeText("package dev.stratus.ui\n\ninternal const val SYMBOLS_FONT = \"$encoded\"\n")
+    }
+}
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
@@ -78,6 +98,7 @@ kotlin {
         commonMain {
             kotlin.srcDir(generateReportingDsn)
             kotlin.srcDir(generateBuildStamp)
+            kotlin.srcDir(generateSymbolsFont)
         }
         commonMain.dependencies {
             // api, not implementation: App() takes a SignInController, so the

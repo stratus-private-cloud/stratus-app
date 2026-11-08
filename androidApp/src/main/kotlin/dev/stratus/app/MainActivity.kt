@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
         const val PART = "dev.stratus.app.PART"
         val SHORTCUT_ICONS = mapOf(
             "files" to R.drawable.shortcut_files,
+            "photos" to R.drawable.shortcut_photos,
             "music" to R.drawable.shortcut_music,
             "videos" to R.drawable.shortcut_videos,
         )

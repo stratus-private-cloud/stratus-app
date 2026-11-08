@@ -72,6 +72,7 @@ DOCKER_RUN = docker run --rm \
 	-e GRADLE_USER_HOME=/gradle \
 	-e KONAN_DATA_DIR=/konan \
 	-e STRATUS_KEYSTORE_BASE64 -e STRATUS_KEYSTORE_PASSWORD -e SENTRY_DSN \
+	-e STRATUS_UPLOAD_KEYSTORE_BASE64 -e STRATUS_UPLOAD_KEYSTORE_PASSWORD -e STRATUS_VERSION_CODE \
 	-e STRATUS_VERSION -e STRATUS_BUILD_DATE
 
 # The wrapper is the source of truth for the Gradle version as soon as it

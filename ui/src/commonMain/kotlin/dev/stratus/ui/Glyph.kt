@@ -10,7 +10,7 @@ package dev.stratus.ui
  * own font on both platforms, and it is the one kind of picture that is already
  * everywhere.
  *
- * [BACK] and [MORE] are deliberately *not* emoji. An emoji arrow is a coloured
+ * [BACK], [MORE] and [ACTIONS] are deliberately *not* emoji. An emoji arrow is a coloured
  * picture of an arrow and reads as one; a navigation bar wants the plain glyph
  * the system font draws, in the colour the theme is using.
  *
@@ -35,7 +35,6 @@ object Glyph {
 
     // A row's kind and what can be done to it: the web UI's listing, mark for
     // mark, so the two read as one thing.
-    const val ACTIONS = SETTINGS
     const val FOLDER = "📁"
     const val PHOTO = "🖼️"
     const val FILM = "🎬"
@@ -70,4 +69,5 @@ object Glyph {
 
     const val BACK = "←"
     const val MORE = "›"
+    const val ACTIONS = "⋮"
 }

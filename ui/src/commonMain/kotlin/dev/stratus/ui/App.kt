@@ -427,4 +427,7 @@ private suspend fun pictureOf(container: AppContainer, entry: DavResource): Imag
     return (answer as? Thumbnail.Picture)?.let { decodePicture(it.bytes) }
 }
 
-private const val TILE_PIXELS = 320
+// 300 and not a pixel more: a Stratus rounds up to 96, 300 or 1200 and makes
+// only the first two ahead, so 320 was a 1200-pixel decode per film on demand
+// -- seconds on one CPU, and the tile gave up before it arrived.
+private const val TILE_PIXELS = 300

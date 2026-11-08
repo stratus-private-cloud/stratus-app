@@ -64,12 +64,14 @@ class AndroidCaster(private val context: Context) : Caster {
         }
     }
 
-    // Whole URLs, token and all, so a failed one can be fetched by hand. They
-    // go only to crash reports somebody switched on, and the token lives a day.
+    // Without the links, logcat included: the trail goes to Sentry, and a link
+    // is a day's access to the file with its name and the server's address in
+    // it (stratus-app#191).
     override fun note(message: String) {
-        Log.i(TAG, message)
+        val line = withoutLinks(message)
+        Log.i(TAG, line)
         synchronized(trail) {
-            if (trail.lastOrNull()?.substringAfter(' ') != message) trail += "+${elapsed()}ms $message"
+            if (trail.lastOrNull()?.substringAfter(' ') != line) trail += "+${elapsed()}ms $line"
         }
     }
 

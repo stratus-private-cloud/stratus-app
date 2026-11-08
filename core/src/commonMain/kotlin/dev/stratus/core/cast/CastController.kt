@@ -93,7 +93,7 @@ class CastController(
     fun offer(entry: DavResource) {
         val item = castItemFor(entry, links, now()) ?: return
         caster.begin()
-        caster.note("offered ${entry.path} (${entry.contentType}) as ${item.contentType} ${item.url}")
+        caster.note("offered ${entry.contentType} as ${item.contentType} ${item.url}")
         item.fallback?.let { caster.note("fallback ${it.contentType} ${it.url}") }
         if (certificateIsPinned) {
             // Before the link is even tried: what the warning is about is the

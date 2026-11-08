@@ -1225,6 +1225,13 @@ records the screen, which here is somebody's photographs, and the NDK handler
 is for native code this app has none of. Screenshots and the view hierarchy are
 the SDK's default off and set off by name, so nobody turns them on by accident.
 
+**A cast trail carries no link** (stratus-app#191). Every link in it is a
+share link, a day's access to the file with the server and the path inside,
+so `withoutLinks` reduces each to its scheme and its query minus the
+signature before it is logged -- https or not and which rendition are what a
+failed cast is diagnosed by. Somebody debugging one by hand reads the link
+off the phone, not out of Sentry.
+
 **The DSN is the build's, never the source's**: `SENTRY_DSN` in the environment
 becomes a generated constant, and without one there is no switch at all. A fork
 cannot report to us, and nobody is asked to consent to something that goes

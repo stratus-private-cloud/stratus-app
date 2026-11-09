@@ -9,3 +9,11 @@ import androidx.compose.ui.graphics.ImageBitmap
  * library would be a dependency for forty pixels.
  */
 internal expect fun decodePicture(bytes: ByteArray): ImageBitmap?
+
+/**
+ * A photograph's original, scaled so its longest side is at most
+ * [longestSide] and turned the way its EXIF says. The platform's decoder
+ * because it is the one that reads HEIC, which no library here would without
+ * bringing a codec along.
+ */
+internal expect fun decodeOriginal(bytes: ByteArray, longestSide: Int): ImageBitmap?

@@ -410,6 +410,19 @@ Three surfaces, and no more than three:
    normal case. iOS is `AVPlayer` with a queue of our own, since
    `AVQueuePlayer` forgets a track once it has played; it cannot honour a pin.
 
+   **Photographs open in the app** (stratus-app#205), full screen and a
+   swipe apart, and what is drawn is **the original** rather than the
+   server's 1200-pixel JPEG: `/thumb/` is a Stratus's alone and the viewer
+   must work against any server, and a picture somebody zooms into is not a
+   thumbnail. So the bytes are downloaded whole -- under a 64 MB ceiling,
+   above which it is handed to another app -- and decoded by the platform,
+   `ImageDecoder` on Android and ImageIO on iOS, because those are what read
+   HEIC; Skia, which `decodePicture` uses, does not. Both scale while
+   decoding to twice the screen and apply the EXIF orientation. What is
+   being viewed is `BrowserState.viewing`, so back closes it before it
+   climbs out of the folder, and the folder's pictures are taken when it
+   opens so a refresh underneath cannot move the one on screen.
+
    **Films play full screen**, on a `VideoScreen` each platform implements:
    an activity of its own with Media3's `PlayerView` on Android, and
    `AVPlayerViewController` on iOS. Which URL is common code

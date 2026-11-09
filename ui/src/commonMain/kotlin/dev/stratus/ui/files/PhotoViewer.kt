@@ -98,6 +98,7 @@ internal fun PhotoViewer(viewing: Viewing, controller: BrowserController) {
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             ViewerAction(Glyph.OPEN, "Open in another app") { menuOpen = false; controller.openFile(shown) }
                             ViewerAction(Glyph.DOWNLOAD, "Download") { menuOpen = false; controller.saveFile(shown) }
+                            ViewerAction(Glyph.SEND, "Send the file") { menuOpen = false; controller.sendFile(shown) }
                             if (controller.canShare) {
                                 ViewerAction(Glyph.SHARE, "Share a link") {
                                     menuOpen = false

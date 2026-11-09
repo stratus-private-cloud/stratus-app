@@ -793,6 +793,12 @@ the system uses to view it; download keeps a copy. On Android that copy has an
 obvious home, on iOS it means the share sheet or the Files app, because there is
 no general filesystem to put it in.
 
+**And sending is a third** (stratus-app#208): `ACTION_SEND` with the file as
+`EXTRA_STREAM`, through the same `FileProvider` Open uses -- the grant rides
+on the `ClipData`, which is what the chooser passes on. It is sharing for any
+server, where a link is sharing for a Stratus. On iOS all three are the one
+share sheet, because that is all the platform has.
+
 **"Which folders" does not survive the crossing to iOS.** Android has folders and
 `DCIM` is one of them. iOS has a photo library with albums, no directories, and
 no notion of a path. The menu entry is the same on both and what it opens cannot

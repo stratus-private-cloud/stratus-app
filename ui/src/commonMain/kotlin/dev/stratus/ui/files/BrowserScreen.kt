@@ -351,6 +351,7 @@ private fun Actions(
         // Two different things: one shows the file, the other keeps it.
         Action(Glyph.OPEN, "Open") { close(); controller.openFile(entry) }
         Action(Glyph.DOWNLOAD, "Download") { close(); controller.saveFile(entry) }
+        Action(Glyph.SEND, "Send the file") { close(); controller.sendFile(entry) }
     }
     if (cast?.canCast(entry) == true) {
         Action(Glyph.SCREEN, "Cast to a screen") { close(); cast.offer(entry) }

@@ -28,11 +28,15 @@ import kotlin.test.assertTrue
 private class RecordingHandoff : FileHandoff {
     val opened = mutableListOf<String>()
     val saved = mutableListOf<String>()
+    val sent = mutableListOf<String>()
     override suspend fun open(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
         opened += name
     }
     override suspend fun save(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
         saved += name
+    }
+    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
+        sent += name
     }
 }
 
@@ -293,7 +297,7 @@ class BrowserControllerTest {
     }
 
     @Test
-    fun handsAFileToThePlatformForOpeningAndForKeeping() = runTest {
+    fun handsAFileToThePlatformForOpeningKeepingAndSending() = runTest {
         val browser = controller(this) { request ->
             if (request.method.value == "GET") HttpStatusCode.OK to "some bytes"
             else HttpStatusCode.MultiStatus to listing("/files/a.txt" to false)
@@ -306,9 +310,12 @@ class BrowserControllerTest {
         browser.settled()
         browser.saveFile(file)
         browser.settled()
+        browser.sendFile(file)
+        browser.settled()
 
         assertEquals(listOf("a.txt"), handoff.opened)
         assertEquals(listOf("a.txt"), handoff.saved)
+        assertEquals(listOf("a.txt"), handoff.sent)
     }
 
     @Test

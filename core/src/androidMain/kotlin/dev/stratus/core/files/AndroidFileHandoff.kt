@@ -1,8 +1,10 @@
 package dev.stratus.core.files
 
+import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
@@ -16,26 +18,47 @@ import java.io.File
 
 /**
  * Opening hands the file to whatever can show it; saving puts a copy in
- * Downloads, where somebody will look for it.
+ * Downloads, where somebody will look for it; sending offers it to whatever
+ * takes a file, which is a chat or an email far more often than a viewer.
  *
- * The two are genuinely different on Android, which is why they are two methods
- * and not one with a flag.
+ * The three are genuinely different on Android, which is why they are three
+ * methods and not one with a flag.
  */
 class AndroidFileHandoff(private val context: Context) : FileHandoff {
 
     override suspend fun open(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
-        val file = File(context.cacheDir, "handoff").apply { mkdirs() }.resolve(name.sanitised())
-        writeTo(Path(file.absolutePath), body)
-
-        // A content URI through a provider, because a file:// URI has been
-        // refused since Android 7 and the failure is a crash in the other app.
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        val uri = cached(name, body)
         val view = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, contentType ?: "*/*")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(
             Intent.createChooser(view, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+    }
+
+    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
+        val uri = cached(name, body)
+        val send = Intent(Intent.ACTION_SEND)
+            .setType(contentType ?: "application/octet-stream")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            // The grant travels with the ClipData and not with EXTRA_STREAM,
+            // and the chooser passes it on to whichever app is picked.
+            .setClipData(ClipData.newRawUri(name.sanitised(), uri))
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(
+            Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    /**
+     * The file in the cache, as a content URI through the app's provider: a
+     * file:// URI has been refused since Android 7 and the failure is a crash
+     * in the other app.
+     */
+    private suspend fun cached(name: String, body: suspend (Sink) -> Unit): Uri {
+        val file = File(context.cacheDir, "handoff").apply { mkdirs() }.resolve(name.sanitised())
+        writeTo(Path(file.absolutePath), body)
+        return FileProvider.getUriForFile(context, "${context.packageName}.files", file)
     }
 
     override suspend fun save(name: String, contentType: String?, body: suspend (Sink) -> Unit): Unit =

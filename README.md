@@ -310,6 +310,12 @@ Nothing is written down either, which is what the choice of lifetime is for.
 There is no list of what you have shared, no withdrawing one link on its own,
 and renaming a shared file breaks its link.
 
+**Send the file** is the other way to share, and it works against any server:
+the file is downloaded and handed to whatever takes one -- a chat, an email,
+Nearby Share -- through Android's share sheet or iOS's. It is the file and not
+a link, so the person at the other end needs nothing, and a large video is
+downloaded to the phone before it can go anywhere.
+
 ## Calendars and contacts
 
 The app does not sync them; it sets up what does. **Calendars and contacts**

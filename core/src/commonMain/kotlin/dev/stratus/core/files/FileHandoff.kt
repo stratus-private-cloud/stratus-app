@@ -17,4 +17,11 @@ interface FileHandoff {
 
     /** Keeps a copy somewhere the person can find it again. */
     suspend fun save(name: String, contentType: String?, body: suspend (Sink) -> Unit)
+
+    /**
+     * Sends the file itself to another app -- a chat, an email -- which is
+     * the other half of sharing: a link needs a Stratus and somebody to open
+     * it, and this needs neither.
+     */
+    suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit)
 }

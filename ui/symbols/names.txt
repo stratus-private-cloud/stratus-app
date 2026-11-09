@@ -24,6 +24,7 @@ person
 picture_as_pdf
 play_arrow
 search
+send
 settings
 share
 skip_next

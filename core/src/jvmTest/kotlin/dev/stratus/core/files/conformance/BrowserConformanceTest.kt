@@ -38,6 +38,9 @@ class BrowserConformanceTest {
         override suspend fun save(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
             received += name
         }
+        override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
+            received += name
+        }
     }
 
     private suspend fun BrowserController.settled(): BrowserState = state.first { !it.busy }

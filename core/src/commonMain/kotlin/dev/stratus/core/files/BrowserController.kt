@@ -114,6 +114,8 @@ class BrowserController(
 
     fun saveFile(entry: DavResource) = transfer(entry) { name, type, body -> handoff.save(name, type, body) }
 
+    fun sendFile(entry: DavResource) = transfer(entry) { name, type, body -> handoff.send(name, type, body) }
+
     /**
      * Opens [entry] in the app's own viewer, with the other pictures in
      * [among] either side of it -- the folder's rows, or a search's.

@@ -17,7 +17,7 @@ sealed interface BackupState {
     /** Everything that could be sent has been. */
     data class Idle(val lastRunAt: Long, val uploaded: Int) : BackupState
 
-    data class Working(val done: Int, val left: Int, val current: String?) : BackupState
+    data class Working(val left: Int, val current: String?) : BackupState
 
     /** It will come back to this on its own. */
     data class Waiting(

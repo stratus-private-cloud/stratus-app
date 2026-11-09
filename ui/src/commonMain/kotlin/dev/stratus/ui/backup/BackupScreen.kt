@@ -102,10 +102,10 @@ internal fun explain(state: BackupState): String = when (state) {
         "Choose a folder below and photographs will start going to your server."
 
     is BackupState.Idle ->
-        "Nothing is waiting. Last run finished at ${state.lastRunAt}."
+        "Nothing is waiting."
 
     is BackupState.Working ->
-        "${state.done} sent so far in this pass."
+        "Sending one at a time, newest first."
 
     is BackupState.Waiting -> when (state.reason) {
         WaitingReason.ForTheNextPass ->

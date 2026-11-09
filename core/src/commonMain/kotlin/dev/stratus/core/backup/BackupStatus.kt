@@ -30,7 +30,7 @@ class BackupStatus(
         val journal = database.journal().read()
 
         if (journal?.running == true) {
-            return BackupState.Working(journal.uploaded, summary.total, journal.currentPath)
+            return BackupState.Working(summary.total, journal.currentPath)
         }
 
         // Something given up on outranks anything still moving: the rest of the

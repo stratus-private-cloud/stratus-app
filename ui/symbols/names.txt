@@ -2,7 +2,9 @@ arrow_back
 backup
 bug_report
 cast
+check_circle
 chevron_right
+close
 cloud
 contact_page
 delete

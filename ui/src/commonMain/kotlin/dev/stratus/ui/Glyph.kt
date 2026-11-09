@@ -49,6 +49,8 @@ object Glyph {
     const val SEND = "\uE163"
     const val RENAME = EDIT
     const val DELETE = "\uE92E"
+    const val SELECTED = "\uF0BE"
+    const val CLOSE = "\uE5CD"
 
     // The sections a Stratus is split into: its tree, its three generated
     // libraries, and the trash, which lives in the menu.

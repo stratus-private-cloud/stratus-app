@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,6 +35,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -108,6 +110,7 @@ fun BrowserScreen(
     // bar for everything else, and never both.
     var pulled by remember { mutableStateOf(false) }
     LaunchedEffect(state.busy) { if (!state.busy) pulled = false }
+    val selecting = state.selected.isNotEmpty()
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
@@ -119,23 +122,41 @@ fun BrowserScreen(
             // changes.
             topBar = {
                 TopAppBar(
+                    // Ticking rows turns the bar into the selection's own, the
+                    // way the web's turns its toolbar into a delete button.
                     navigationIcon = {
-                        if (onClose != null) {
+                        if (selecting) {
+                            IconButton(
+                                onClick = { controller.clearSelection() },
+                                modifier = Modifier.semantics { contentDescription = "Clear the selection" },
+                            ) { Symbol(Glyph.CLOSE, Modifier.clearAndSetSemantics {}) }
+                        } else if (onClose != null) {
                             IconButton(onClick = onClose) { Symbol(Glyph.BACK) }
                         }
                     },
                     title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(StratusMark, contentDescription = null, Modifier.size(22.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Stratus")
+                        if (selecting) {
+                            Text("${state.selected.size} selected")
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(StratusMark, contentDescription = null, Modifier.size(22.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Stratus")
+                            }
                         }
                     },
                     actions = {
-                        if (onSearch != null) {
-                            IconButton(onClick = onSearch) { Symbol(Glyph.SEARCH) }
+                        if (selecting) {
+                            IconButton(
+                                onClick = controller::askToDeleteSelected,
+                                modifier = Modifier.semantics { contentDescription = "Delete the selected" },
+                            ) { Symbol(Glyph.DELETE, Modifier.clearAndSetSemantics {}) }
+                        } else {
+                            if (onSearch != null) {
+                                IconButton(onClick = onSearch) { Symbol(Glyph.SEARCH) }
+                            }
+                            IconButton(onClick = onOpenSettings) { Symbol(Glyph.SETTINGS) }
                         }
-                        IconButton(onClick = onOpenSettings) { Symbol(Glyph.SETTINGS) }
                     },
                 )
             },
@@ -179,7 +200,12 @@ fun BrowserScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             items(state.entries, key = { it.path }) { entry ->
-                                Tile(entry, controller, cover, onPlay = videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } })
+                                Tile(
+                                    entry, controller, cover,
+                                    onPlay = videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } },
+                                    selected = entry.path in state.selected,
+                                    selecting = selecting,
+                                )
                             }
                         }
                     } else {
@@ -190,6 +216,9 @@ fun BrowserScreen(
                                     onPlay = music?.takeIf { it.canPlay(entry) }?.let { m -> { m.play(state.entries, entry) } }
                                         ?: videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } },
                                     playOnTap = playOnTap,
+                                    selected = entry.path in state.selected,
+                                    selecting = selecting,
+                                    onSelect = controller::toggle,
                                 )
                                 HorizontalDivider()
                             }
@@ -204,6 +233,7 @@ fun BrowserScreen(
 
     when (val pending = state.pending) {
         is Confirmation.Delete -> DeleteDialog(pending.target, controller)
+        is Confirmation.DeleteSeveral -> DeleteSeveralDialog(pending.targets, controller)
         is Confirmation.Rename -> RenameDialog(pending.target, controller)
         is Confirmation.Share -> ShareDialog(pending.target, controller)
         null -> {}
@@ -247,21 +277,29 @@ private fun Tile(
     controller: BrowserController,
     cover: suspend (DavResource) -> ImageBitmap?,
     onPlay: (() -> Unit)? = null,
+    selected: Boolean = false,
+    selecting: Boolean = false,
 ) {
     val picture by produceState<ImageBitmap?>(null, entry.path) { value = cover(entry) }
+    val shape = RoundedCornerShape(8.dp)
     Column(
-        Modifier.clickable {
-            when {
-                entry.isDirectory -> controller.enter(entry)
-                onPlay != null -> onPlay()
-                isPicture(entry) -> controller.view(entry)
-                else -> controller.openFile(entry)
-            }
-        },
+        Modifier.combinedClickable(
+            onClick = {
+                when {
+                    selecting -> controller.toggle(entry)
+                    entry.isDirectory -> controller.enter(entry)
+                    onPlay != null -> onPlay()
+                    isPicture(entry) -> controller.view(entry)
+                    else -> controller.openFile(entry)
+                }
+            },
+            onLongClick = { controller.toggle(entry) },
+        ),
     ) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+            Modifier.fillMaxWidth().aspectRatio(1f).clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(if (selected) 3.dp else 0.dp, MaterialTheme.colorScheme.primary, shape),
             contentAlignment = Alignment.Center,
         ) {
             val shown = picture
@@ -269,6 +307,13 @@ private fun Tile(
                 Image(shown, contentDescription = null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } else {
                 Symbol(markOf(entry), Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.displaySmall)
+            }
+            if (selected) {
+                Symbol(
+                    Glyph.SELECTED,
+                    Modifier.align(Alignment.TopEnd).padding(6.dp).clearAndSetSemantics {},
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
         Text(entry.name, Modifier.padding(top = 6.dp), maxLines = 2, style = MaterialTheme.typography.bodyMedium)
@@ -296,6 +341,10 @@ internal fun Entry(
     playOnTap: Boolean = false,
     /** Opens this photograph in the viewer, among the listing's others unless told otherwise. */
     onView: () -> Unit = { controller.view(entry) },
+    selected: Boolean = false,
+    selecting: Boolean = false,
+    /** Ticks or unticks this row; null where rows cannot be selected, such as search results. */
+    onSelect: ((DavResource) -> Unit)? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -303,7 +352,12 @@ internal fun Entry(
     // gear on the right. Tapping and holding the row still open the same menu,
     // since the gear is a small target and the row is the whole width.
     ListItem(
-        leadingContent = { Symbol(markOf(entry)) },
+        leadingContent = {
+            if (selected) Symbol(Glyph.SELECTED, color = MaterialTheme.colorScheme.primary) else Symbol(markOf(entry))
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else ListItemDefaults.containerColor,
+        ),
         headlineContent = { Text(entry.name) },
         supportingContent = { Text(if (entry.isDirectory) "Folder" else describe(entry)) },
         trailingContent = {
@@ -317,7 +371,7 @@ internal fun Entry(
                     modifier = Modifier.semantics { contentDescription = "Actions on ${entry.name}" },
                 ) { Symbol(Glyph.ACTIONS, Modifier.clearAndSetSemantics {}) }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    Actions(entry, controller, cast, onPlay, close = { menuOpen = false })
+                    Actions(entry, controller, cast, onPlay, onSelect, close = { menuOpen = false })
                 }
             }
         },
@@ -327,13 +381,16 @@ internal fun Entry(
         modifier = Modifier.combinedClickable(
             onClick = {
                 when {
+                    selecting && onSelect != null -> onSelect(entry)
                     entry.isDirectory -> onEnter(entry)
                     playOnTap && onPlay != null -> onPlay()
                     isPicture(entry) -> onView()
                     else -> menuOpen = true
                 }
             },
-            onLongClick = { menuOpen = true },
+            // Holding selects, as it does in every Android file manager, where
+            // there is a selection to make; the menu is the three dots.
+            onLongClick = { if (onSelect != null) onSelect(entry) else menuOpen = true },
         ),
     )
 }
@@ -344,9 +401,11 @@ private fun Actions(
     controller: BrowserController,
     cast: CastController?,
     onPlay: (() -> Unit)?,
+    onSelect: ((DavResource) -> Unit)?,
     close: () -> Unit,
 ) {
     if (onPlay != null) Action(Glyph.PLAY, "Play") { close(); onPlay() }
+    if (onSelect != null) Action(Glyph.SELECTED, "Select") { close(); onSelect(entry) }
     if (!entry.isDirectory) {
         // Two different things: one shows the file, the other keeps it.
         Action(Glyph.OPEN, "Open") { close(); controller.openFile(entry) }
@@ -406,12 +465,27 @@ private fun DeleteDialog(target: DavResource, controller: BrowserController) {
     AlertDialog(
         onDismissRequest = controller::dismiss,
         title = { Text("Delete ${target.name}?") },
-        // There is no trash anywhere in Stratus, so this is the only chance.
-        text = { Text("This cannot be undone. There is no trash to recover it from.") },
+        text = { Text(WHERE_DELETED_GOES) },
         confirmButton = { TextButton(onClick = controller::confirmDelete) { Text("Delete") } },
         dismissButton = { TextButton(onClick = controller::dismiss) { Text("Cancel") } },
     )
 }
+
+@Composable
+private fun DeleteSeveralDialog(targets: List<DavResource>, controller: BrowserController) {
+    AlertDialog(
+        onDismissRequest = controller::dismiss,
+        title = { Text("Delete ${targets.size} items?") },
+        text = { Text(WHERE_DELETED_GOES) },
+        confirmButton = { TextButton(onClick = controller::confirmDeleteSeveral) { Text("Delete") } },
+        dismissButton = { TextButton(onClick = controller::dismiss) { Text("Cancel") } },
+    )
+}
+
+// What deleting means depends on the server, and the app only knows a Stratus
+// by its sections, so it says both rather than guessing.
+private const val WHERE_DELETED_GOES =
+    "On a Stratus this goes to the trash. On other servers it cannot be undone."
 
 @Composable
 private fun RenameDialog(target: DavResource, controller: BrowserController) {

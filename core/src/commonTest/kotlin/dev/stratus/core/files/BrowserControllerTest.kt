@@ -233,6 +233,69 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun severalAreDeletedOneRequestEach() = runTest {
+        val browser = controller(this) { request ->
+            if (request.method.value == "DELETE") HttpStatusCode.NoContent to ""
+            else HttpStatusCode.MultiStatus to listing("/files/a.jpg" to false, "/files/b.jpg" to false, "/files/c.jpg" to false)
+        }
+        browser.start()
+        browser.settled()
+        val (a, _, c) = browser.state.value.entries
+        browser.toggle(a)
+        browser.toggle(c)
+
+        browser.askToDeleteSelected()
+        assertEquals(Confirmation.DeleteSeveral(listOf(a, c)), browser.state.value.pending)
+        browser.confirmDeleteSeveral()
+        val state = browser.settled()
+
+        val deleted = seen.filter { it.method.value == "DELETE" }.map { it.url.encodedPath }
+        assertEquals(listOf("/files/a.jpg", "/files/c.jpg"), deleted)
+        assertTrue(state.selected.isEmpty())
+        assertNull(state.failure)
+    }
+
+    @Test
+    fun oneTheServerRefusesDoesNotStopTheRest() = runTest {
+        val browser = controller(this) { request ->
+            when {
+                request.method.value != "DELETE" ->
+                    HttpStatusCode.MultiStatus to listing("/files/a.jpg" to false, "/files/b.jpg" to false)
+                request.url.encodedPath.endsWith("a.jpg") -> HttpStatusCode.Forbidden to ""
+                else -> HttpStatusCode.NoContent to ""
+            }
+        }
+        browser.start()
+        browser.settled()
+        browser.state.value.entries.forEach(browser::toggle)
+
+        browser.askToDeleteSelected()
+        browser.confirmDeleteSeveral()
+        val state = browser.settled()
+
+        assertEquals(2, seen.count { it.method.value == "DELETE" })
+        assertTrue(state.failure is BrowserFailure.Operation, "was ${state.failure}")
+    }
+
+    @Test
+    fun backUnticksBeforeLeavingTheFolder() = runTest {
+        val browser = controller(this, answer = listingOf("/files/photos" to true, "/files/photos/a.jpg" to false))
+        browser.start()
+        browser.settled()
+        browser.enter(browser.state.value.entries.first { it.isDirectory })
+        browser.settled()
+        browser.toggle(browser.state.value.entries.first { it.name == "a.jpg" })
+
+        assertTrue(browser.goUp())
+        assertTrue(browser.state.value.selected.isEmpty())
+        assertEquals("/files/photos", browser.state.value.path)
+
+        browser.toggle(browser.state.value.entries.first { it.name == "a.jpg" })
+        browser.toggle(browser.state.value.entries.first { it.name == "a.jpg" })
+        assertTrue(browser.state.value.selected.isEmpty())
+    }
+
+    @Test
     fun dismissingAConfirmationDoesNothingAtAll() = runTest {
         val browser = controller(this, answer = listingOf("/files/a.txt" to false))
         browser.start()

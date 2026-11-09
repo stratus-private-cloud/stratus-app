@@ -77,10 +77,12 @@ class BrowserController(
 
     /**
      * True when there was somewhere to go. The floor is the end of the line,
-     * and a photograph open is a step of its own: back closes it first.
+     * and a photograph open or a selection made is a step of its own: back
+     * undoes it first.
      */
     fun goUp(): Boolean {
         if (stopViewing()) return true
+        if (clearSelection()) return true
         val here = mutable.value.path.trimEnd('/')
         if (here.isEmpty() || here == floor.trimEnd('/')) return false
         go(here.substringBeforeLast('/').ifEmpty { "" } + "/")
@@ -91,7 +93,9 @@ class BrowserController(
 
     private fun go(path: String) {
         running?.cancel()
-        mutable.value = mutable.value.copy(path = path, busy = true, failure = null, pending = null, viewing = null)
+        mutable.value = mutable.value.copy(
+            path = path, busy = true, failure = null, pending = null, viewing = null, selected = emptySet(),
+        )
         running = scope.launch { load(path) }
     }
 
@@ -210,6 +214,57 @@ class BrowserController(
                 LinkAnswer.NoAnswer -> BrowserFailure.Unreachable(timedOut = false)
             }
             mutable.value = mutable.value.copy(failure = failure)
+        }
+    }
+
+    /** Ticks [entry] if it was not, and unticks it if it was. */
+    fun toggle(entry: DavResource) {
+        val selected = mutable.value.selected
+        mutable.value = mutable.value.copy(
+            selected = if (entry.path in selected) selected - entry.path else selected + entry.path,
+        )
+    }
+
+    /** True when something was selected. */
+    fun clearSelection(): Boolean {
+        if (mutable.value.selected.isEmpty()) return false
+        mutable.value = mutable.value.copy(selected = emptySet())
+        return true
+    }
+
+    fun askToDeleteSelected() {
+        val state = mutable.value
+        val targets = state.entries.filter { it.path in state.selected }
+        if (targets.isNotEmpty()) ask(Confirmation.DeleteSeveral(targets))
+    }
+
+    /**
+     * One `DELETE` per file, in the order they are listed, which is what
+     * WebDAV has and what makes each a line of its own in a Stratus's trash.
+     * One the server refuses does not stop the rest; one it never answers
+     * does, since the next would ask the same silent server.
+     */
+    fun confirmDeleteSeveral() {
+        val targets = (mutable.value.pending as? Confirmation.DeleteSeveral)?.targets ?: return
+        running?.cancel()
+        mutable.value = mutable.value.copy(busy = true, pending = null, failure = null)
+        running = scope.launch {
+            var failure: BrowserFailure? = null
+            for (target in targets) {
+                try {
+                    dav.delete(target.path)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: DavError) {
+                    failure = failure ?: classify(e, target)
+                } catch (e: Exception) {
+                    failure = unreachable(e)
+                    break
+                }
+            }
+            mutable.value = mutable.value.copy(selected = emptySet())
+            load(mutable.value.path)
+            if (failure != null) mutable.value = mutable.value.copy(failure = failure)
         }
     }
 

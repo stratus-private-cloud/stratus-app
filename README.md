@@ -255,6 +255,11 @@ where no proxy has rewritten it.
 Signed in at any other address, or against any other server, there is one
 browser and it opens where it was pointed.
 
+Holding a row or a tile selects it, and tapping others adds them; the bar
+then deletes the lot, asking once. Each is deleted on its own -- one `DELETE`
+each, so on a Stratus each is a line of its own in the trash -- and one the
+server refuses does not stop the rest.
+
 What is not there yet: the trash can be looked through and copied out of but
 not restored from (stratus-app#179).
 
@@ -297,7 +302,7 @@ playing a film with the screen off.
 
 ## Sharing
 
-Hold a row in the browser and the app makes a link anybody can open without an
+A file's or a folder's menu makes a link anybody can open without an
 account -- a file, or a folder and what is under it -- for a day, a week, a
 month, or until you change your password.
 
@@ -328,7 +333,7 @@ not shown.
 
 ## Casting
 
-Hold a photograph or a video and send it to a Chromecast. It uses Google's
+From a photograph's or a video's menu, send it to a Chromecast. It uses Google's
 default receiver, so there is nothing to register and nothing to pay: what the
 television fetches is a signed link that needs no account.
 

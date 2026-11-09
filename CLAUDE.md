@@ -1284,7 +1284,8 @@ the token is the one secret it needs.
 ## Play releases (stratus-app#89)
 
 **A Play listing became part of the plan on 2026-11-08** (stratus-app#90): a
-beta on the internal track, so testers update from the store. The README used
+beta on the internal track, so testers update from the store, and **an open
+beta is the first public step** (decided 2026-11-09, #202). The README used
 to say it was not.
 
 **Two keys, kept apart on purpose.** The sideloading key signs the debug APK
@@ -1300,7 +1301,9 @@ than failing, and Play would only say so after a manual upload.
 
 **The upload is curl, openssl and jq** (`scripts/play-upload.sh`, #92): a
 JWT signed with the service account's key, exchanged for a token, then an edit
-on the Publisher API -- bundle, track, commit. Not a marketplace action,
+on the Publisher API -- bundle, track, commit. **The track is chosen when
+the workflow is run** (#204): internal, closed or open, which the API still
+calls `internal`, `alpha` and `beta`. Not a marketplace action,
 because whatever runs there holds a key that can publish the app. The account
 can release to testing tracks only, so production stays a hand in the Console.
 

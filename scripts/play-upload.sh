@@ -1,15 +1,23 @@
 #!/bin/sh
-# Sends a signed AAB to Play's internal track (stratus-app#92), with the Play
-# Developer API and nothing but curl, openssl and jq: a third-party action here
-# would be code nobody reviewed holding a key that can publish the app.
+# Sends a signed AAB to one of Play's testing tracks (stratus-app#92, #204),
+# with the Play Developer API and nothing but curl, openssl and jq: a
+# third-party action here would be code nobody reviewed holding a key that can
+# publish the app.
 #
-#   PLAY_SERVICE_ACCOUNT_JSON='<key>' scripts/play-upload.sh app.aab 0.1.7
+#   PLAY_SERVICE_ACCOUNT_JSON='<key>' scripts/play-upload.sh app.aab 0.1.7 [internal|closed|open]
 set -eu
 
 AAB="$1"
 NAME="$2"
 PACKAGE=dev.stratus.app
-TRACK=internal
+# The Console's names on the left, the API's on the right, which still calls
+# closed and open testing by what they were called before.
+case "${3:-internal}" in
+  internal) TRACK=internal ;;
+  closed) TRACK=alpha ;;
+  open) TRACK=beta ;;
+  *) echo "no such track: $3 (internal, closed or open)" >&2; exit 2 ;;
+esac
 API="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE"
 UPLOAD="https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$PACKAGE"
 

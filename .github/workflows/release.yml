@@ -4,6 +4,12 @@ name: Release
 # accepts, and every upload spends a versionCode for good.
 on:
   workflow_dispatch:
+    inputs:
+      track:
+        description: Play testing track
+        type: choice
+        options: [internal, closed, open]
+        default: internal
 
 concurrency:
   group: release
@@ -61,7 +67,8 @@ jobs:
           path: stratus-${{ env.STRATUS_VERSION }}.aab
           if-no-files-found: error
 
-      - name: Send it to the internal track
-        run: scripts/play-upload.sh "stratus-$STRATUS_VERSION.aab" "$STRATUS_VERSION"
+      - name: Send it to the ${{ inputs.track }} track
+        run: scripts/play-upload.sh "stratus-$STRATUS_VERSION.aab" "$STRATUS_VERSION" "$TRACK"
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          TRACK: ${{ inputs.track }}

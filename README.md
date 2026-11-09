@@ -438,14 +438,18 @@ own; see below.
 
 ## Google Play
 
-The app is going on Google Play as a beta first, on the internal testing
-track, so testers get updates from the store instead of sideloading
-(stratus-app#89).
+The app is going on Google Play as a beta first: on the internal testing
+track today, so testers get updates from the store instead of sideloading
+(stratus-app#89), and next as an open beta anybody can join from the store
+listing, which waits on the Console's declarations (stratus-app#202).
 
 A Play build is made by hand: run the **Release** workflow from
 [Actions](https://github.com/stratus-private-cloud/stratus-app/actions/workflows/release.yml).
 It builds a release AAB, signs it with the upload key, attaches it to the run
-and sends it to the internal testing track (stratus-app#92). Release notes, if
+and sends it to the testing track chosen when it is run -- internal, closed or
+open -- internal by default (stratus-app#92, #204). Closed and open are
+reviewed by Google, so a release there is live once the review passes rather
+than at once, and the track has to have been set up in the Console first. Release notes, if
 any, are added in the Play Console afterwards. The version code is the run number and the version name is
 `0.1.<run number>`, so every run can be uploaded once and only once.
 

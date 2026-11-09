@@ -41,10 +41,10 @@ class AndroidFileHandoff(private val context: Context) : FileHandoff {
         val send = Intent(Intent.ACTION_SEND)
             .setType(contentType ?: "application/octet-stream")
             .putExtra(Intent.EXTRA_STREAM, uri)
-            // The grant travels with the ClipData and not with EXTRA_STREAM,
-            // and the chooser passes it on to whichever app is picked.
-            .setClipData(ClipData.newRawUri(name.sanitised(), uri))
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // The grant travels with the ClipData and not with EXTRA_STREAM, and
+        // the chooser passes it on to whichever app is picked.
+        send.clipData = ClipData.newRawUri(name.sanitised(), uri)
         context.startActivity(
             Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )

@@ -1285,6 +1285,12 @@ and the run number only goes up. The workflow fails if the bundle is not
 signed by the upload key: without the secrets Gradle builds it unsigned rather
 than failing, and Play would only say so after a manual upload.
 
+**The upload is curl, openssl and jq** (`scripts/play-upload.sh`, #92): a
+JWT signed with the service account's key, exchanged for a token, then an edit
+on the Publisher API -- bundle, track, commit. Not a marketplace action,
+because whatever runs there holds a key that can publish the app. The account
+can release to testing tracks only, so production stays a hand in the Console.
+
 
 
 A line per file into the platform's log, naming what went and how much is

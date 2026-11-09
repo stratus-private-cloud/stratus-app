@@ -434,14 +434,20 @@ track, so testers get updates from the store instead of sideloading
 
 A Play build is made by hand: run the **Release** workflow from
 [Actions](https://github.com/stratus-private-cloud/stratus-app/actions/workflows/release.yml).
-It builds a release AAB, signs it with the upload key and attaches it to the
-run. The version code is the run number and the version name is
+It builds a release AAB, signs it with the upload key, attaches it to the run
+and sends it to the internal testing track (stratus-app#92). Release notes, if
+any, are added in the Play Console afterwards. The version code is the run number and the version name is
 `0.1.<run number>`, so every run can be uploaded once and only once.
 
 The upload key is a repository secret, `STRATUS_UPLOAD_KEYSTORE_BASE64`, with
 its password in `STRATUS_UPLOAD_KEYSTORE_PASSWORD`. It is not the key users
 see: Play signs what reaches phones with a key of its own, so a lost upload
 key is a reset requested from Google.
+
+The upload to Play uses a Google Cloud service account, whose JSON key is the
+secret `PLAY_SERVICE_ACCOUNT_JSON`. It needs the Google Play Android Developer
+API enabled in its project and, in Play Console → Users and permissions, the
+right to release to testing tracks for this app and nothing more.
 
 ## What cannot be promised on Android
 

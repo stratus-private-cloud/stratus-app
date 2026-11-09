@@ -10,6 +10,8 @@ data class BrowserState(
     val failure: BrowserFailure? = null,
     val pending: Confirmation? = null,
     val viewing: Viewing? = null,
+    /** The paths ticked for deleting together; empty is not selecting at all. */
+    val selected: Set<String> = emptySet(),
 )
 
 /**
@@ -20,6 +22,9 @@ data class BrowserState(
  */
 sealed interface Confirmation {
     data class Delete(val target: DavResource) : Confirmation
+
+    /** Several at once, each its own `DELETE` and so its own line in a trash. */
+    data class DeleteSeveral(val targets: List<DavResource>) : Confirmation
     data class Rename(val target: DavResource) : Confirmation
 
     /**

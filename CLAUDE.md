@@ -423,6 +423,13 @@ Three surfaces, and no more than three:
    climbs out of the folder, and the folder's pictures are taken when it
    opens so a refresh underneath cannot move the one on screen.
 
+   **Several can be deleted at once** (stratus-app#210): holding a row or a
+   tile ticks it, as in any Android file manager, and the bar becomes the
+   selection's. It is one `DELETE` per file and never anything batched,
+   because WebDAV has no batch and a Stratus's trash then lists each file on
+   its own line, which is what was asked for. Holding used to open the row's
+   menu, and the three dots are that menu now.
+
    **Films play full screen**, on a `VideoScreen` each platform implements:
    an activity of its own with Media3's `PlayerView` on Android, and
    `AVPlayerViewController` on iOS. Which URL is common code

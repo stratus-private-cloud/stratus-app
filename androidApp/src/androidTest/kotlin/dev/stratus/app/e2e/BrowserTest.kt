@@ -1,6 +1,8 @@
 package dev.stratus.app.e2e
 
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.longClick
@@ -74,7 +76,7 @@ class BrowserTest : E2E() {
 
         tap("doomed.txt")
         tap("Delete")
-        see("This cannot be undone")
+        see("cannot be undone")
         tap("Cancel")
         assertTrue(Stratus.exists("/$unique/doomed.txt"), "cancelling deleted it")
 
@@ -136,11 +138,11 @@ class BrowserTest : E2E() {
     }
 
     @Test
-    fun aFolderCanBeRenamedFromItsLongPressMenu() {
+    fun aFolderCanBeRenamedFromItsMenu() {
         Stratus.folder("/$unique/")
         signedIn()
 
-        see(unique).performTouchInput { longClick() }
+        ui.onNodeWithContentDescription("Actions on $unique").performClick()
         tap("Rename")
         ui.onNode(hasSetTextAction()).performTextClearance()
         ui.onNode(hasSetTextAction()).performTextInput("${unique}b")
@@ -148,6 +150,27 @@ class BrowserTest : E2E() {
 
         see("${unique}b")
         assertTrue(Stratus.exists("/${unique}b/"))
+    }
+
+    @Test
+    fun severalAreSelectedAndDeletedTogether() {
+        Stratus.folder("/$unique/")
+        Stratus.file("/$unique/one.txt")
+        Stratus.file("/$unique/two.txt")
+        Stratus.file("/$unique/kept.txt")
+        signedIn()
+        tap(unique)
+
+        see("one.txt").performTouchInput { longClick() }
+        tap("two.txt")
+        see("2 selected")
+        ui.onNodeWithContentDescription("Delete the selected").performClick()
+        see("Delete 2 items?")
+        tap("Delete")
+
+        gone("one.txt")
+        gone("two.txt")
+        assertEquals(listOf("kept.txt"), Stratus.names("/$unique/"))
     }
 
     @Test

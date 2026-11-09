@@ -64,6 +64,7 @@ import dev.stratus.core.dav.DavResource
 import dev.stratus.core.files.BrowserController
 import dev.stratus.core.files.BrowserFailure
 import dev.stratus.core.files.Confirmation
+import dev.stratus.core.files.isPicture
 import dev.stratus.core.play.MusicController
 import dev.stratus.core.play.VideoController
 import dev.stratus.core.share.ShareLife
@@ -108,93 +109,97 @@ fun BrowserScreen(
     var pulled by remember { mutableStateOf(false) }
     LaunchedEffect(state.busy) { if (!state.busy) pulled = false }
 
-    Scaffold(
-        // The app's own bar, and the only one that is: the mark and the name on
-        // the left and the menu on the right, which is the web UI's navbar
-        // (stratus-app#140). What used to be here -- the path, and an arrow to
-        // climb out of it -- is a row of its own below, because a bar that
-        // changes with the folder is not somewhere to put the thing that never
-        // changes.
-        topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    if (onClose != null) {
-                        IconButton(onClick = onClose) { Symbol(Glyph.BACK) }
-                    }
-                },
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(StratusMark, contentDescription = null, Modifier.size(22.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Stratus")
-                    }
-                },
-                actions = {
-                    if (onSearch != null) {
-                        IconButton(onClick = onSearch) { Symbol(Glyph.SEARCH) }
-                    }
-                    IconButton(onClick = onOpenSettings) { Symbol(Glyph.SETTINGS) }
-                },
-            )
-        },
-        bottomBar = bottomBar,
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            banner()
-            Where(state.path, controller.floor, up = { controller.goUp() })
-            if (state.busy && !pulled) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.failure?.let {
-                Text(explain(it), Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp))
-                // Without it, the only way to ask again after a server came back
-                // was to walk somewhere else and back.
-                if (it.isRejectedSignIn()) {
-                    // Trying again with the same password cannot help, and the
-                    // next thing somebody needs is the form to type the new one.
-                    TextButton(onClick = onEditServer, Modifier.padding(horizontal = 8.dp)) { Text("Edit server") }
-                } else {
-                    TextButton(onClick = controller::refresh, Modifier.padding(horizontal = 8.dp)) { Text("Try again") }
-                }
-            }
-
-            if (cast != null) CastBar(cast)
-
-            // The one way to see what another client added since the folder was
-            // opened, short of walking out and back in (stratus-app#82).
-            PullToRefreshBox(
-                isRefreshing = pulled && state.busy,
-                onRefresh = {
-                    pulled = true
-                    controller.refresh()
-                },
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                if (cover != null && tiles(state.path)) {
-                    LazyVerticalGrid(
-                        GridCells.Adaptive(150.dp),
-                        Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(state.entries, key = { it.path }) { entry ->
-                            Tile(entry, controller, cover, onPlay = videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } })
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            // The app's own bar, and the only one that is: the mark and the name on
+            // the left and the menu on the right, which is the web UI's navbar
+            // (stratus-app#140). What used to be here -- the path, and an arrow to
+            // climb out of it -- is a row of its own below, because a bar that
+            // changes with the folder is not somewhere to put the thing that never
+            // changes.
+            topBar = {
+                TopAppBar(
+                    navigationIcon = {
+                        if (onClose != null) {
+                            IconButton(onClick = onClose) { Symbol(Glyph.BACK) }
                         }
+                    },
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(StratusMark, contentDescription = null, Modifier.size(22.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Stratus")
+                        }
+                    },
+                    actions = {
+                        if (onSearch != null) {
+                            IconButton(onClick = onSearch) { Symbol(Glyph.SEARCH) }
+                        }
+                        IconButton(onClick = onOpenSettings) { Symbol(Glyph.SETTINGS) }
+                    },
+                )
+            },
+            bottomBar = bottomBar,
+        ) { padding ->
+            Column(Modifier.padding(padding).fillMaxSize()) {
+                banner()
+                Where(state.path, controller.floor, up = { controller.goUp() })
+                if (state.busy && !pulled) LinearProgressIndicator(Modifier.fillMaxWidth())
+                state.failure?.let {
+                    Text(explain(it), Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp))
+                    // Without it, the only way to ask again after a server came back
+                    // was to walk somewhere else and back.
+                    if (it.isRejectedSignIn()) {
+                        // Trying again with the same password cannot help, and the
+                        // next thing somebody needs is the form to type the new one.
+                        TextButton(onClick = onEditServer, Modifier.padding(horizontal = 8.dp)) { Text("Edit server") }
+                    } else {
+                        TextButton(onClick = controller::refresh, Modifier.padding(horizontal = 8.dp)) { Text("Try again") }
                     }
-                } else {
-                    LazyColumn(Modifier.fillMaxSize()) {
-                        items(state.entries, key = { it.path }) { entry ->
-                            Entry(
-                                entry, controller, cast,
-                                onPlay = music?.takeIf { it.canPlay(entry) }?.let { m -> { m.play(state.entries, entry) } }
-                                    ?: videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } },
-                                playOnTap = playOnTap,
-                            )
-                            HorizontalDivider()
+                }
+
+                if (cast != null) CastBar(cast)
+
+                // The one way to see what another client added since the folder was
+                // opened, short of walking out and back in (stratus-app#82).
+                PullToRefreshBox(
+                    isRefreshing = pulled && state.busy,
+                    onRefresh = {
+                        pulled = true
+                        controller.refresh()
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    if (cover != null && tiles(state.path)) {
+                        LazyVerticalGrid(
+                            GridCells.Adaptive(150.dp),
+                            Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(state.entries, key = { it.path }) { entry ->
+                                Tile(entry, controller, cover, onPlay = videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } })
+                            }
+                        }
+                    } else {
+                        LazyColumn(Modifier.fillMaxSize()) {
+                            items(state.entries, key = { it.path }) { entry ->
+                                Entry(
+                                    entry, controller, cast,
+                                    onPlay = music?.takeIf { it.canPlay(entry) }?.let { m -> { m.play(state.entries, entry) } }
+                                        ?: videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } },
+                                    playOnTap = playOnTap,
+                                )
+                                HorizontalDivider()
+                            }
                         }
                     }
                 }
             }
         }
+
+        state.viewing?.let { PhotoViewer(it, controller) }
     }
 
     when (val pending = state.pending) {
@@ -249,6 +254,7 @@ private fun Tile(
             when {
                 entry.isDirectory -> controller.enter(entry)
                 onPlay != null -> onPlay()
+                isPicture(entry) -> controller.view(entry)
                 else -> controller.openFile(entry)
             }
         },
@@ -288,6 +294,8 @@ internal fun Entry(
     /** Plays this track and what follows it, where it is one. */
     onPlay: (() -> Unit)? = null,
     playOnTap: Boolean = false,
+    /** Opens this photograph in the viewer, among the listing's others unless told otherwise. */
+    onView: () -> Unit = { controller.view(entry) },
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -321,6 +329,7 @@ internal fun Entry(
                 when {
                     entry.isDirectory -> onEnter(entry)
                     playOnTap && onPlay != null -> onPlay()
+                    isPicture(entry) -> onView()
                     else -> menuOpen = true
                 }
             },

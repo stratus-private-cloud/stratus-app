@@ -9,6 +9,7 @@ data class BrowserState(
     val busy: Boolean = false,
     val failure: BrowserFailure? = null,
     val pending: Confirmation? = null,
+    val viewing: Viewing? = null,
 )
 
 /**

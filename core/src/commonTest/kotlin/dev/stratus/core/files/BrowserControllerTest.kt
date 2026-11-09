@@ -404,6 +404,72 @@ class BrowserControllerTest {
         assertEquals("HEAD", check.method.value)
         assertNull(check.headers["Authorization"])
     }
+
+    @Test
+    fun aPhotographOpensAmongTheFoldersOtherPictures() = runTest {
+        val browser = controller(
+            this,
+            answer = listingOf(
+                "/files/2026" to true,
+                "/files/a.heic" to false,
+                "/files/notes.txt" to false,
+                "/files/b.jpg" to false,
+            ),
+        )
+        browser.start()
+        browser.settled()
+
+        browser.view(browser.state.value.entries.first { it.name == "b.jpg" })
+
+        val viewing = browser.state.value.viewing!!
+        assertEquals(listOf("a.heic", "b.jpg"), viewing.among.map { it.name })
+        assertEquals(1, viewing.at)
+    }
+
+    @Test
+    fun backClosesThePhotographBeforeLeavingTheFolder() = runTest {
+        val browser = controller(this, answer = listingOf("/files/photos" to true, "/files/photos/a.jpg" to false))
+        browser.start()
+        browser.settled()
+        browser.enter(browser.state.value.entries.first { it.isDirectory })
+        browser.settled()
+        browser.view(browser.state.value.entries.first { it.name == "a.jpg" })
+
+        assertTrue(browser.goUp())
+        assertNull(browser.state.value.viewing)
+        assertEquals("/files/photos", browser.state.value.path)
+    }
+
+    @Test
+    fun aFileThatIsNotAPictureIsNotViewed() = runTest {
+        val browser = controller(this, answer = listingOf("/files/notes.txt" to false))
+        browser.start()
+        browser.settled()
+        browser.view(browser.state.value.entries.single())
+        assertNull(browser.state.value.viewing)
+    }
+
+    @Test
+    fun theOriginalIsTheFileItself() = runTest {
+        val browser = controller(this) { HttpStatusCode.OK to "the bytes" }
+        val original = browser.original(DavResource("/files/a.heic", isDirectory = false, size = 9))
+        assertEquals("the bytes", (original as Original.Bytes).bytes.decodeToString())
+        assertEquals("/files/a.heic", seen.single().url.encodedPath)
+    }
+
+    @Test
+    fun anOriginalTooLargeToHoldIsNotAskedFor() = runTest {
+        val browser = controller(this) { HttpStatusCode.OK to "" }
+        val original = browser.original(DavResource("/files/a.jpg", isDirectory = false, size = LARGEST_ORIGINAL + 1))
+        assertEquals(Original.TooLarge, original)
+        assertTrue(seen.isEmpty())
+    }
+
+    @Test
+    fun anOriginalTheServerRefusesIsAFailure() = runTest {
+        val browser = controller(this) { HttpStatusCode.NotFound to "" }
+        assertEquals(Original.Failed, browser.original(DavResource("/files/a.jpg", isDirectory = false)))
+    }
 }
 
 /**

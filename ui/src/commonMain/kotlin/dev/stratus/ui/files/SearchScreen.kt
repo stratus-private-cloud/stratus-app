@@ -1,6 +1,7 @@
 package dev.stratus.ui.files
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,50 +51,54 @@ fun SearchScreen(
     onClose: () -> Unit,
 ) {
     val state by search.state.collectAsState()
+    val browsing by browser.state.collectAsState()
 
-    Page("Search", onBack = onClose, scroll = false) {
-        OutlinedTextField(
-            value = state.term,
-            onValueChange = search::typed,
-            label = { Text("A word in the name") },
-            singleLine = true,
-            // Not a search per keystroke: the answer has no ranking to improve
-            // as a word grows, and on somebody's own server every letter would
-            // be a full-text query whose answer is thrown away.
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { search.submit() }),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-
-        // Only where there is a choice: at the root both answers are the same
-        // tree, and a control whose two sides agree is furniture.
-        state.here?.let { folder ->
-            Where(folder, state.everywhere, search::look)
-        }
-
-        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-
-        when {
-            // Nothing is known yet, which is a moment and not a state worth
-            // drawing something for.
-            state.offered == null && state.ran == null -> {}
-
-            state.offered == false -> Explain("This server cannot search.")
-
-            state.unreachable != null -> Explain(
-                "The server did not answer.",
-                state.unreachable,
+    Box(Modifier.fillMaxSize()) {
+        Page("Search", onBack = onClose, scroll = false) {
+            OutlinedTextField(
+                value = state.term,
+                onValueChange = search::typed,
+                label = { Text("A word in the name") },
+                singleLine = true,
+                // Not a search per keystroke: the answer has no ranking to improve
+                // as a word grows, and on somebody's own server every letter would
+                // be a full-text query whose answer is thrown away.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { search.submit() }),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
-            state.failure != null -> Explain(
-                "The search did not go through.",
-                describe(state.failure!!),
-            )
+            // Only where there is a choice: at the root both answers are the same
+            // tree, and a control whose two sides agree is furniture.
+            state.here?.let { folder ->
+                Where(folder, state.everywhere, search::look)
+            }
 
-            state.empty -> Explain("Nothing matches \"${state.ran}\".")
+            if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
 
-            else -> Results(state, browser, cast, onOpenFolder)
+            when {
+                // Nothing is known yet, which is a moment and not a state worth
+                // drawing something for.
+                state.offered == null && state.ran == null -> {}
+
+                state.offered == false -> Explain("This server cannot search.")
+
+                state.unreachable != null -> Explain(
+                    "The server did not answer.",
+                    state.unreachable,
+                )
+
+                state.failure != null -> Explain(
+                    "The search did not go through.",
+                    describe(state.failure!!),
+                )
+
+                state.empty -> Explain("Nothing matches \"${state.ran}\".")
+
+                else -> Results(state, browser, cast, onOpenFolder)
+            }
         }
+        browsing.viewing?.let { PhotoViewer(it, browser) }
     }
 }
 
@@ -110,7 +115,7 @@ private fun Results(
     if (state.cut) Footnote("The first ${state.found.size}, and there are more.")
     LazyColumn(Modifier.fillMaxSize()) {
         items(state.found, key = { it.path }) { entry ->
-            Entry(entry, browser, cast, onEnter = onOpenFolder)
+            Entry(entry, browser, cast, onEnter = onOpenFolder, onView = { browser.view(entry, state.found) })
             HorizontalDivider()
         }
     }

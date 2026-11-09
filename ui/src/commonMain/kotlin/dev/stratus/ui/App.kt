@@ -279,6 +279,8 @@ private fun SignedIn(
         back.onBack = when (screen) {
             is Screen.Browser -> browser?.let { { it.goUp() } } ?: { false }
             is Screen.Trash -> { { trash?.goUp() == true || leave() } }
+            // A photograph opened from a result is shown over this screen.
+            is Screen.Search -> { { browser?.stopViewing() == true || leave() } }
             else -> { { leave() } }
         }
         onDispose { back.onBack = null }

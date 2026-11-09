@@ -19,6 +19,7 @@ import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.exhausted
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.Sink
+import kotlinx.io.readByteArray
 
 /**
  * Walking the tree, and the four things that can be done to what is in it.
@@ -74,8 +75,12 @@ class BrowserController(
 
     fun enter(directory: DavResource) = go(directory.path)
 
-    /** True when there was somewhere to go. The floor is the end of the line. */
+    /**
+     * True when there was somewhere to go. The floor is the end of the line,
+     * and a photograph open is a step of its own: back closes it first.
+     */
     fun goUp(): Boolean {
+        if (stopViewing()) return true
         val here = mutable.value.path.trimEnd('/')
         if (here.isEmpty() || here == floor.trimEnd('/')) return false
         go(here.substringBeforeLast('/').ifEmpty { "" } + "/")
@@ -86,7 +91,7 @@ class BrowserController(
 
     private fun go(path: String) {
         running?.cancel()
-        mutable.value = mutable.value.copy(path = path, busy = true, failure = null, pending = null)
+        mutable.value = mutable.value.copy(path = path, busy = true, failure = null, pending = null, viewing = null)
         running = scope.launch { load(path) }
     }
 
@@ -108,6 +113,46 @@ class BrowserController(
     fun openFile(entry: DavResource) = transfer(entry) { name, type, body -> handoff.open(name, type, body) }
 
     fun saveFile(entry: DavResource) = transfer(entry) { name, type, body -> handoff.save(name, type, body) }
+
+    /**
+     * Opens [entry] in the app's own viewer, with the other pictures in
+     * [among] either side of it -- the folder's rows, or a search's.
+     */
+    fun view(entry: DavResource, among: List<DavResource> = mutable.value.entries) {
+        val pictures = among.filter(::isPicture)
+        val at = pictures.indexOfFirst { it.path == entry.path }
+        if (at < 0) return
+        mutable.value = mutable.value.copy(viewing = Viewing(pictures, at), pending = null)
+    }
+
+    /** True when there was a photograph open. */
+    fun stopViewing(): Boolean {
+        if (mutable.value.viewing == null) return false
+        mutable.value = mutable.value.copy(viewing = null)
+        return true
+    }
+
+    /**
+     * The file itself, not the server's rendering of it: a Stratus would make
+     * a 1200-pixel JPEG, and any other server makes nothing. Outside [running]
+     * on purpose -- the viewer asks for the photographs either side while one
+     * is shown, and none of them is a reason to cancel a listing.
+     */
+    suspend fun original(entry: DavResource): Original {
+        if ((entry.size ?: 0) > LARGEST_ORIGINAL) return Original.TooLarge
+        return try {
+            dav.read(entry.path) { channel ->
+                // One byte over the ceiling is how a server that reported no
+                // size, or the wrong one, is caught without reading the rest.
+                val bytes = channel.readRemaining(LARGEST_ORIGINAL + 1).readByteArray()
+                if (bytes.size > LARGEST_ORIGINAL) Original.TooLarge else Original.Bytes(bytes)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            Original.Failed
+        }
+    }
 
     private fun transfer(
         entry: DavResource,

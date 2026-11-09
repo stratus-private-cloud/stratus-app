@@ -248,8 +248,7 @@ a bar at the bottom moves between Files, Photos, Music and Videos, each a
 browser that stays inside its own collection, and Trash is in the settings
 menu beside Backup and Server. On Android the same four are on the app icon's
 long press, as the web app's are. Music draws an artist's albums as a grid of
-covers, and Photos and Videos a month as a grid of thumbnails; tapping a
-photograph opens it in the phone's own viewer. It knows it is a
+covers, and Photos and Videos a month as a grid of thumbnails. It knows it is a
 Stratus by the `Stratus-Version` header of one `OPTIONS`, or `Server: Stratus/…`
 where no proxy has rewritten it.
 
@@ -258,6 +257,17 @@ browser and it opens where it was pointed.
 
 What is not there yet: the trash can be looked through and copied out of but
 not restored from (stratus-app#179).
+
+## Looking at photographs
+
+Tapping a picture, in Photos or anywhere in Files, opens it full screen in the
+app, and a swipe goes to the next one in the folder; pinch or double tap to
+zoom. What it shows is **the original**, downloaded and decoded by the phone
+itself -- HEIC included -- so it works against any WebDAV server and costs a
+download per photograph rather than a thumbnail. Its menu still opens the file
+in another app, downloads it, or shares a link. Two limits: a picture over
+64 MB opens in another app instead, and TIFF and camera raw files always do,
+because Android cannot read them.
 
 ## Playing music
 

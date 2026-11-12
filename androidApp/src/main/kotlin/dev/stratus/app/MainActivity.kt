@@ -78,8 +78,13 @@ class MainActivity : ComponentActivity() {
         // the tree is what back means while browsing; anywhere else it leaves.
         onBackPressedDispatcher.addCallback(this) {
             if (back.onBack?.invoke() != true) {
+                // Off for this one press, so the system has it, and on again:
+                // since Android 12 back at the root does not destroy the
+                // activity, so one left off made every later back leave the
+                // app from inside a folder.
                 isEnabled = false
                 onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
             }
         }
 

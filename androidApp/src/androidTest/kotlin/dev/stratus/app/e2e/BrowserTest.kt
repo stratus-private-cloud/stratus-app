@@ -34,6 +34,26 @@ class BrowserTest : E2E() {
         gone("inside.txt")
     }
 
+    // Back at the root leaves the app without destroying the activity, and
+    // the gesture used to stay handed to the system once it had: coming back,
+    // back from inside a folder left the app again instead of walking up.
+    @Test
+    fun theGestureStillWalksUpAfterItHasLeftTheApp() {
+        Stratus.folder("/$unique/")
+        Stratus.file("/$unique/inside.txt")
+        signedIn()
+        see(unique)
+
+        Phone.device.pressBack()
+        Phone.toHomeAndBack()
+
+        tap(unique)
+        see("inside.txt")
+        Phone.device.pressBack()
+        see(unique)
+        gone("inside.txt")
+    }
+
     // stratus-app#82: something another client added shows without walking
     // out of the folder and back.
     @Test

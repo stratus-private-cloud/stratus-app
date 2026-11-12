@@ -44,6 +44,7 @@ object Glyph {
     const val CONTACT = "\uF22E"
     const val DOCUMENT = "\uE873"
     const val OPEN = "\uE8F4"
+    const val DETAILS = "\uE88E"
     const val DOWNLOAD = "\uF090"
     const val SHARE = "\uE80D"
     const val SEND = "\uE163"

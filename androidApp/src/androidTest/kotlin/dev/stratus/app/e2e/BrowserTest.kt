@@ -51,6 +51,20 @@ class BrowserTest : E2E() {
     }
 
     @Test
+    fun aFileSaysWhatItIsFromItsMenu() {
+        Stratus.folder("/$unique/")
+        Stratus.file("/$unique/notes.txt")
+        signedIn()
+        tap(unique)
+
+        tap("notes.txt")
+        tap("Details")
+
+        see("$unique/notes.txt")
+        tap("Close")
+    }
+
+    @Test
     fun renamesAFileOnTheServer() {
         Stratus.folder("/$unique/")
         Stratus.file("/$unique/before.txt")

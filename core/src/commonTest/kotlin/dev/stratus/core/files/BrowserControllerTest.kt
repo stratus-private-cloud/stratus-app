@@ -392,6 +392,22 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun detailsAreWhatTheListingKnewAndAskTheServerNothing() = runTest {
+        val browser = controller(this, answer = listingOf("/files/photos/a.txt" to false))
+        browser.start()
+        browser.settled()
+        seen.clear()
+        val target = browser.state.value.entries.single()
+
+        browser.ask(Confirmation.Details(target))
+        assertEquals(Confirmation.Details(target), browser.state.value.pending)
+        browser.dismiss()
+
+        assertNull(browser.state.value.pending)
+        assertEquals(emptyList(), seen.map { it.method.value })
+    }
+
+    @Test
     fun sharingHandsTheSystemALinkAndNothingGoesToTheServer() = runTest {
         val browser = controller(this, answer = listingOf("/files/photos/a.txt" to false))
         browser.start()

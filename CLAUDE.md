@@ -1240,6 +1240,11 @@ embedAndSign task, and this app links the framework Gradle built, so it would
 be missing on a phone and nowhere else. Android cannot load a font from bytes,
 so its half writes them to the cache directory first.
 
+**The web UI draws the same file** (stratus-backend#497), copied byte for
+byte under a name carrying its hash, so a name added here is one the web can
+use and a regenerated font is one to copy across. `info` is in the list for
+Details, which both have.
+
 ## The launcher icon's menu
 
 **A Stratus's parts are on the icon's long press on Android**, the shortcuts

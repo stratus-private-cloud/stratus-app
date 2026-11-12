@@ -33,6 +33,12 @@ sealed interface Confirmation {
      * taken back either.
      */
     data class Share(val target: DavResource) : Confirmation
+
+    /**
+     * Nothing to confirm at all: what the listing already knows about one
+     * entry, put up in the same slot so that only one thing is ever open.
+     */
+    data class Details(val target: DavResource) : Confirmation
 }
 
 /**

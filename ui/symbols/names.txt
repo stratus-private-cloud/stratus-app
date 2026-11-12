@@ -15,6 +15,7 @@ event
 folder
 folder_zip
 image
+info
 label
 link
 logout

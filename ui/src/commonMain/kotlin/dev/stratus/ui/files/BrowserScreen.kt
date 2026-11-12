@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,6 +59,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.stratus.ui.backup.size
+import dev.stratus.ui.dateTime
 import dev.stratus.core.cast.CastController
 import dev.stratus.core.cast.CastDevice
 import dev.stratus.core.cast.CastState
@@ -236,6 +239,7 @@ fun BrowserScreen(
         is Confirmation.DeleteSeveral -> DeleteSeveralDialog(pending.targets, controller)
         is Confirmation.Rename -> RenameDialog(pending.target, controller)
         is Confirmation.Share -> ShareDialog(pending.target, controller)
+        is Confirmation.Details -> DetailsDialog(pending.target, controller)
         null -> {}
     }
 }
@@ -415,6 +419,7 @@ private fun Actions(
     if (cast?.canCast(entry) == true) {
         Action(Glyph.SCREEN, "Cast to a screen") { close(); cast.offer(entry) }
     }
+    Action(Glyph.DETAILS, "Details") { close(); controller.ask(Confirmation.Details(entry)) }
     if (controller.canShare) {
         Action(Glyph.SHARE, "Share a link") { close(); controller.ask(Confirmation.Share(entry)) }
     }
@@ -511,6 +516,42 @@ private fun describe(entry: DavResource): String {
         size < 1024 * 1024 * 1024 -> "${size / (1024 * 1024)} MB"
         else -> "${size / (1024 * 1024 * 1024)} GB"
     }
+}
+
+/**
+ * The web UI's Details, as far as WebDAV reaches: the file's own half of it.
+ * What the server's indexer has read -- a camera, a codec, a track's tags --
+ * has no standard property to travel in, so it is not here.
+ */
+@Composable
+private fun DetailsDialog(target: DavResource, controller: BrowserController) {
+    val facts = buildList {
+        add("Type" to (if (target.isDirectory) "Folder" else target.contentType))
+        target.size?.takeIf { !target.isDirectory }?.let { add("Size" to "${size(it)} ($it bytes)") }
+        add("Modified" to target.lastModifiedEpochMs?.let(::dateTime))
+        add("ETag" to target.etag)
+        add("Path" to target.path)
+        add("Stored at" to target.source)
+    }.mapNotNull { (label, value) -> value?.takeIf { it.isNotBlank() }?.let { label to it } }
+
+    AlertDialog(
+        onDismissRequest = controller::dismiss,
+        title = { Text(target.name) },
+        text = {
+            // Selectable, because a path and an ETag are things to copy.
+            SelectionContainer {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((label, value) in facts) {
+                        Column {
+                            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(value, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = controller::dismiss) { Text("Close") } },
+    )
 }
 
 /**

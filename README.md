@@ -260,6 +260,11 @@ then deletes the lot, asking once. Each is deleted on its own -- one `DELETE`
 each, so on a Stratus each is a line of its own in the trash -- and one the
 server refuses does not stop the rest.
 
+A row's menu has Details: its type, size, date, ETag and path, which is what
+the listing already knew -- so on a Stratus it is the web UI's Details without
+the half the indexer reads, a camera or a track's tags, which WebDAV has no
+property for.
+
 What is not there yet: the trash can be looked through and copied out of but
 not restored from (stratus-app#179).
 

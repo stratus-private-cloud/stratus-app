@@ -58,6 +58,24 @@ class DavClient(
     suspend fun stat(path: String): DavResource =
         propfind(path, Depth.Zero).firstOrNull() ?: throw DavError.NotFound(path)
 
+    /**
+     * What a Stratus's indexer knows about one file, asked for by name because
+     * that is the only way it answers them. Any other server answers a 404 for
+     * each, which is an empty [MediaInfo] rather than an error.
+     */
+    suspend fun info(path: String): MediaInfo {
+        val response = http.request(url(path, collection = false)) {
+            method = PROPFIND
+            header(HttpHeaders.Depth, Depth.Zero.header)
+            contentType(ContentType.Application.Xml)
+            setBody(MultiStatus.infoBody())
+        }
+        if (response.status.value == 207 || response.status.value == 200) {
+            return MultiStatus.parseInfo(response.bodyAsText())
+        }
+        throw response.toError(path)
+    }
+
     suspend fun propfind(path: String, depth: Depth, collection: Boolean = false): List<DavResource> {
         val response = http.request(url(path, collection)) {
             method = PROPFIND

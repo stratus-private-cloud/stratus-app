@@ -2,6 +2,7 @@ package dev.stratus.core.files
 
 import dev.stratus.core.dav.DavError
 import dev.stratus.core.dav.DavResource
+import dev.stratus.core.dav.MediaInfo
 
 data class BrowserState(
     val path: String = "/",
@@ -48,7 +49,13 @@ sealed interface Confirmation {
      * Nothing to confirm at all: what the listing already knows about one
      * entry, put up in the same slot so that only one thing is ever open.
      */
-    data class Details(val target: DavResource) : Confirmation
+    data class Details(
+        val target: DavResource,
+        /** What the server's indexer read, once it has answered; null before that and where it could not. */
+        val info: MediaInfo? = null,
+        /** Whether that is still being asked. */
+        val looking: Boolean = false,
+    ) : Confirmation
 }
 
 /**

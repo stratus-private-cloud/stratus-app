@@ -60,12 +60,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.stratus.ui.backup.size
 import dev.stratus.ui.dateTime
+import dev.stratus.ui.mapUri
+import dev.stratus.ui.wallClock
 import dev.stratus.core.cast.CastController
 import dev.stratus.core.cast.CastDevice
 import dev.stratus.core.cast.CastState
@@ -156,6 +159,15 @@ fun BrowserScreen(
                     },
                     actions = {
                         if (selecting) {
+                            // The way to a tile's Details, which has no menu of its own.
+                            state.selected.singleOrNull()
+                                ?.let { only -> state.entries.firstOrNull { it.path == only } }
+                                ?.let { only ->
+                                    IconButton(
+                                        onClick = { controller.details(only) },
+                                        modifier = Modifier.semantics { contentDescription = "Details" },
+                                    ) { Symbol(Glyph.DETAILS, Modifier.clearAndSetSemantics {}) }
+                                }
                             IconButton(
                                 onClick = controller::askToDeleteSelected,
                                 modifier = Modifier.semantics { contentDescription = "Delete the selected" },
@@ -251,7 +263,7 @@ fun BrowserScreen(
         is Confirmation.DeleteSeveral -> DeleteSeveralDialog(pending.targets, controller)
         is Confirmation.Rename -> RenameDialog(pending.target, controller)
         is Confirmation.Share -> ShareDialog(pending.target, controller)
-        is Confirmation.Details -> DetailsDialog(pending.target, controller)
+        is Confirmation.Details -> DetailsDialog(pending, controller)
         null -> {}
     }
 }
@@ -511,7 +523,7 @@ private fun Actions(
     if (cast?.canCast(entry) == true) {
         Action(Glyph.SCREEN, "Cast to a screen") { close(); cast.offer(entry) }
     }
-    Action(Glyph.DETAILS, "Details") { close(); controller.ask(Confirmation.Details(entry)) }
+    Action(Glyph.DETAILS, "Details") { close(); controller.details(entry) }
     if (controller.canShare) {
         Action(Glyph.SHARE, "Share a link") { close(); controller.ask(Confirmation.Share(entry)) }
     }
@@ -611,13 +623,19 @@ private fun describe(entry: DavResource): String {
 }
 
 /**
- * The web UI's Details, as far as WebDAV reaches: the file's own half of it.
- * What the server's indexer has read -- a camera, a codec, a track's tags --
- * has no standard property to travel in, so it is not here.
+ * The web UI's Details: the file's own half, which the listing already knew,
+ * and on a Stratus the half its indexer read -- when, how big, which camera,
+ * where, how long -- which arrives a moment later.
  */
 @Composable
-private fun DetailsDialog(target: DavResource, controller: BrowserController) {
+private fun DetailsDialog(details: Confirmation.Details, controller: BrowserController) {
+    val target = details.target
+    val info = details.info
     val facts = buildList {
+        add("Taken" to info?.taken?.let(::wallClock))
+        add("Dimensions" to info?.let { i -> i.width?.let { w -> i.height?.let { h -> "$w × $h" } } })
+        add("Duration" to info?.durationMs?.let(::clock))
+        add("Camera" to info?.camera)
         add("Type" to (if (target.isDirectory) "Folder" else target.contentType))
         target.size?.takeIf { !target.isDirectory }?.let { add("Size" to "${size(it)} ($it bytes)") }
         add("Modified" to target.lastModifiedEpochMs?.let(::dateTime))
@@ -625,25 +643,59 @@ private fun DetailsDialog(target: DavResource, controller: BrowserController) {
         add("Path" to target.path)
         add("Stored at" to target.source)
     }.mapNotNull { (label, value) -> value?.takeIf { it.isNotBlank() }?.let { label to it } }
+    val latitude = info?.latitude
+    val longitude = info?.longitude
+    val uris = LocalUriHandler.current
 
     AlertDialog(
         onDismissRequest = controller::dismiss,
         title = { Text(target.name) },
         text = {
-            // Selectable, because a path and an ETag are things to copy.
-            SelectionContainer {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((label, value) in facts) {
-                        Column {
-                            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(value, style = MaterialTheme.typography.bodyMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (details.looking) LinearProgressIndicator(Modifier.fillMaxWidth())
+                // Selectable, because a path and an ETag are things to copy.
+                SelectionContainer {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for ((label, value) in facts) Fact(label, value)
+                        if (latitude != null && longitude != null) {
+                            Fact("Location", "${coordinate(latitude)}, ${coordinate(longitude)}")
                         }
                     }
+                }
+                if (latitude != null && longitude != null) {
+                    TextButton(
+                        // No maps app is a phone that cannot open it, not a crash.
+                        onClick = { runCatching { uris.openUri(mapUri(latitude, longitude)) } },
+                    ) { Text("Open in maps") }
                 }
             }
         },
         confirmButton = { TextButton(onClick = controller::dismiss) { Text("Close") } },
     )
+}
+
+@Composable
+private fun Fact(label: String, value: String) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Five places, about a metre, which is what the server sends. */
+private fun coordinate(degrees: Double): String {
+    val scaled = kotlin.math.round(degrees * 100_000).toLong()
+    val sign = if (scaled < 0) "-" else ""
+    val whole = kotlin.math.abs(scaled)
+    return "$sign${whole / 100_000}.${(whole % 100_000).toString().padStart(5, '0')}"
+}
+
+/** 3:07 for a clip and 1:52:30 for a film. */
+private fun clock(ms: Long): String {
+    val total = ms / 1000
+    val (h, m, sec) = Triple(total / 3600, total / 60 % 60, total % 60)
+    val mmss = "${m.toString().padStart(if (h > 0) 2 else 1, '0')}:${sec.toString().padStart(2, '0')}"
+    return if (h > 0) "$h:$mmss" else mmss
 }
 
 /**

@@ -185,4 +185,38 @@ class MultiStatusTest {
     fun asksForIt() {
         assertTrue(MultiStatus.propfindBody().contains("<source xmlns=\"https://github.com/C0piIot/stratus\"/>"))
     }
+
+    /**
+     * The indexer's half (stratus-backend#502): what the file carries in a
+     * 200 block and what it does not in a 404 one, which is not a value.
+     */
+    @Test
+    fun readsWhatTheIndexerRead() {
+        val info = MultiStatus.parseInfo(
+            """<?xml version="1.0" encoding="UTF-8"?><D:multistatus xmlns:D="DAV:"><D:response><D:href>/photos/2024/06/IMG_0001.JPG</D:href>""" +
+                """<D:propstat><D:prop><taken xmlns="https://github.com/C0piIot/stratus">2024-06-15T18:30:05</taken>""" +
+                """<S:width xmlns:S="https://github.com/C0piIot/stratus">4032</S:width><height xmlns="https://github.com/C0piIot/stratus">3024</height>""" +
+                """<camera xmlns="https://github.com/C0piIot/stratus">Apple iPhone 15 &amp; Co</camera>""" +
+                """<location xmlns="https://github.com/C0piIot/stratus">41.38506 2.17340</location></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat>""" +
+                """<D:propstat><D:prop><duration xmlns="https://github.com/C0piIot/stratus"/></D:prop><D:status>HTTP/1.1 404 Not Found</D:status></D:propstat>""" +
+                """</D:response></D:multistatus>""",
+        )
+        assertEquals(
+            MediaInfo(
+                taken = "2024-06-15T18:30:05", width = 4032, height = 3024, camera = "Apple iPhone 15 & Co",
+                latitude = 41.38506, longitude = 2.1734,
+            ),
+            info,
+        )
+    }
+
+    @Test
+    fun anyOtherServerKnowsNothing() {
+        val info = MultiStatus.parseInfo(
+            """<multistatus xmlns="DAV:"><response><href>/a.jpg</href><propstat><prop>""" +
+                """<taken xmlns="https://github.com/C0piIot/stratus"/><location xmlns="https://github.com/C0piIot/stratus"/>""" +
+                """</prop><status>HTTP/1.1 404 Not Found</status></propstat></response></multistatus>""",
+        )
+        assertEquals(MediaInfo(), info)
+    }
 }

@@ -289,6 +289,33 @@ class BrowserController(
         mutable.value = mutable.value.copy(pending = confirmation, failure = null)
     }
 
+    /**
+     * [Confirmation.Details] for [entry], with what the server's indexer read
+     * arriving after it: a file asks, since that half is one `PROPFIND` the
+     * listing did not make, and a folder has none. Outside [running], like
+     * [original], because nothing about a dialog is a reason to cancel a
+     * listing -- and a failure leaves the half the listing knew.
+     */
+    fun details(entry: DavResource) {
+        mutable.value = mutable.value.copy(
+            pending = Confirmation.Details(entry, looking = !entry.isDirectory), failure = null,
+        )
+        if (entry.isDirectory) return
+        scope.launch {
+            val info = try {
+                dav.info(entry.path)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
+            val pending = mutable.value.pending
+            if (pending is Confirmation.Details && pending.target == entry) {
+                mutable.value = mutable.value.copy(pending = pending.copy(info = info, looking = false))
+            }
+        }
+    }
+
     fun dismiss() {
         mutable.value = mutable.value.copy(pending = null)
     }

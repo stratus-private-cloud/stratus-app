@@ -90,6 +90,10 @@ internal fun PhotoViewer(viewing: Viewing, controller: BrowserController) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    IconButton(
+                        onClick = { controller.details(shown) },
+                        modifier = Modifier.semantics { contentDescription = "Details of ${shown.name}" },
+                    ) { Symbol(Glyph.DETAILS, Modifier.clearAndSetSemantics {}, color = Color.White) }
                     Box {
                         IconButton(
                             onClick = { menuOpen = true },

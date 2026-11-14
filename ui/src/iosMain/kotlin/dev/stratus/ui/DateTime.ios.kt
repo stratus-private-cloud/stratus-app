@@ -12,16 +12,15 @@ internal actual fun dateTime(epochMs: Long): String =
         timeStyle = NSDateFormatterShortStyle
     }.stringFromDate(NSDate.dateWithTimeIntervalSince1970(epochMs / 1000.0))
 
+// Parsed and written in the same zone, the phone's, which hands the wall
+// clock back unchanged -- the one hour a year that zone skips aside.
 internal actual fun wallClock(taken: String): String? {
-    val utc = platform.Foundation.NSTimeZone(name = "UTC")
     val parsed = NSDateFormatter().apply {
         dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         locale = platform.Foundation.NSLocale(localeIdentifier = "en_US_POSIX")
-        timeZone = utc
     }.dateFromString(taken) ?: return null
     return NSDateFormatter().apply {
         dateStyle = NSDateFormatterMediumStyle
         timeStyle = NSDateFormatterShortStyle
-        timeZone = utc
     }.stringFromDate(parsed)
 }

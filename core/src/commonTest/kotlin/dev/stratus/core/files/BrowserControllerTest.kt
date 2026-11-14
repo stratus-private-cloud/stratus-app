@@ -81,6 +81,7 @@ class BrowserControllerTest {
         server: String? = null,
         base: String = "http://host/",
         floor: String = "/",
+        timeline: Boolean = false,
         answer: (HttpRequestData) -> Pair<HttpStatusCode, String>,
     ): BrowserController {
         val engine = MockEngine { request ->
@@ -101,6 +102,7 @@ class BrowserControllerTest {
                 links,
             ) { 1_700_000_000 },
             floor,
+            timeline,
         )
     }
 
@@ -157,6 +159,85 @@ class BrowserControllerTest {
         val browser = BrowserController(DavClient(HttpClient(engine), "http://host/"), handoff, this)
         browser.start()
         assertEquals("/files/", browser.settled().path)
+    }
+
+    /** A Stratus's `photos/`: two years, an empty month, and three photographs. */
+    private val photos = mapOf(
+        "/photos/" to listing("/photos/2025" to true, "/photos/2026" to true),
+        "/photos/2026/" to listing("/photos/2026/10" to true, "/photos/2026/11" to true),
+        "/photos/2026/11/" to listing("/photos/2026/11/2026-11-01_a.jpg" to false, "/photos/2026/11/2026-11-09_b.jpg" to false),
+        "/photos/2026/10/" to listing(),
+        "/photos/2025/" to listing("/photos/2025/03" to true),
+        "/photos/2025/03/" to listing("/photos/2025/03/c.jpg" to false),
+    )
+
+    private fun timeline(scope: TestScope, failing: Set<String> = emptySet()) =
+        controller(scope, floor = "/photos/", timeline = true) { request ->
+            val path = request.url.encodedPath
+            if (path in failing) HttpStatusCode.InternalServerError to "" else HttpStatusCode.MultiStatus to photos.getValue(path)
+        }
+
+    @Test
+    fun aTimelineOpensOnItsNewestMonthNewestFirst() = runTest {
+        val browser = timeline(this)
+        browser.start()
+        val state = browser.settled()
+        assertEquals(listOf("/photos/2026/11"), state.months.map { it.path })
+        assertEquals(2026 to 11, state.months.single().year to state.months.single().month)
+        assertEquals(listOf("2026-11-09_b.jpg", "2026-11-01_a.jpg"), state.entries.map { it.name })
+        assertTrue(state.more)
+        assertEquals("/photos/", state.path)
+    }
+
+    @Test
+    fun aTimelineScrollsIntoOlderMonthsAndPastEmptyOnes() = runTest {
+        val browser = timeline(this)
+        browser.start()
+        browser.settled()
+
+        browser.loadMore()
+        val state = browser.settled()
+        assertEquals(listOf("/photos/2026/11", "/photos/2025/03"), state.months.map { it.path })
+        assertEquals(listOf("2026-11-09_b.jpg", "2026-11-01_a.jpg", "c.jpg"), state.entries.map { it.name })
+        assertTrue(!state.more)
+
+        // At the oldest, asking for more asks the server nothing.
+        val asked = seen.size
+        browser.loadMore()
+        assertEquals(asked, seen.size)
+        // And the viewer swipes across months, not within one.
+        browser.view(state.entries.first())
+        assertEquals(3, browser.state.value.viewing?.among?.size)
+    }
+
+    @Test
+    fun aMonthThatFailsKeepsWhatIsLoadedAndIsNextAgain() = runTest {
+        val failing = mutableSetOf("/photos/2025/03/")
+        val browser = timeline(this, failing)
+        browser.start()
+        browser.settled()
+
+        browser.loadMore()
+        val failed = browser.settled()
+        assertTrue(failed.failure is BrowserFailure.Listing)
+        assertEquals(listOf("/photos/2026/11"), failed.months.map { it.path })
+        assertTrue(failed.more)
+
+        failing.clear()
+        browser.loadMore()
+        assertEquals(listOf("/photos/2026/11", "/photos/2025/03"), browser.settled().months.map { it.path })
+    }
+
+    @Test
+    fun aRefreshedTimelineKeepsAsManyMonthsAsWereLoaded() = runTest {
+        val browser = timeline(this)
+        browser.start()
+        browser.settled()
+        browser.loadMore()
+        browser.settled()
+
+        browser.refresh()
+        assertEquals(listOf("/photos/2026/11", "/photos/2025/03"), browser.settled().months.map { it.path })
     }
 
     @Test

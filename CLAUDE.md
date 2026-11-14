@@ -401,6 +401,17 @@ Three surfaces, and no more than three:
    a second API; against any other server, or a Stratus pointed below its
    origin, there is one browser where it was pointed and no bar.
 
+   **Photos and Videos are timelines**, as the web's gallery is: one scroll,
+   newest first, a heading per month, instead of a year and a month to walk
+   into. It is still `BrowserController` -- `timeline` changes how it lists
+   and nothing it does to a file -- so the viewer, the selection and the menu
+   are the same, and the viewer swipes across months. The months come a
+   `PROPFIND` each as the scroll reaches them, because the server refuses
+   `Depth: infinity`; a collection leaves the queue only once listed, so a
+   failure leaves it next. Within a month the order is by name, since
+   `getlastmodified` is when the file was written rather than taken and a
+   backup's names begin with the moment of the photograph.
+
    **Music plays in the app** (stratus-app#180), behind a `Player` each
    platform implements and a `MusicController` in common code that turns a
    folder into a queue of signed links -- the cast's links, so the player

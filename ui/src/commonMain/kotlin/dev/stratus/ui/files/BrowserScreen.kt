@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +30,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.DropdownMenu
@@ -52,8 +55,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -69,6 +74,7 @@ import dev.stratus.core.dav.DavResource
 import dev.stratus.core.files.BrowserController
 import dev.stratus.core.files.BrowserFailure
 import dev.stratus.core.files.Confirmation
+import dev.stratus.core.files.TimelineMonth
 import dev.stratus.core.files.isPicture
 import dev.stratus.core.play.MusicController
 import dev.stratus.core.play.VideoController
@@ -167,8 +173,12 @@ fun BrowserScreen(
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
                 banner()
-                Where(state.path, controller.floor, up = { controller.goUp() })
-                if (state.busy && !pulled) LinearProgressIndicator(Modifier.fillMaxWidth())
+                // A timeline has no folder to say and nowhere to climb to, and
+                // the next month loading shows at the end of the scroll.
+                if (!controller.timeline) Where(state.path, controller.floor, up = { controller.goUp() })
+                if (state.busy && !pulled && !(controller.timeline && state.months.isNotEmpty())) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
                 state.failure?.let {
                     Text(explain(it), Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp))
                     // Without it, the only way to ask again after a server came back
@@ -194,7 +204,9 @@ fun BrowserScreen(
                     },
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    if (cover != null && tiles(state.path)) {
+                    if (controller.timeline && cover != null) {
+                        Timeline(state.months, state.more, controller, cover, videos, state.selected)
+                    } else if (cover != null && tiles(state.path)) {
                         LazyVerticalGrid(
                             GridCells.Adaptive(150.dp),
                             Modifier.fillMaxSize(),
@@ -272,6 +284,75 @@ private fun Where(path: String, floor: String, up: () -> Unit) {
 }
 
 /**
+ * A Stratus's photographs or recordings as one scroll, newest first, under a
+ * heading per month -- the web's gallery. The next month is asked for as the
+ * end comes into view; the controller ignores the ask while it is busy, and
+ * what it loads changes the count, which asks again until the screen is full.
+ */
+@Composable
+private fun Timeline(
+    months: List<TimelineMonth>,
+    more: Boolean,
+    controller: BrowserController,
+    cover: suspend (DavResource) -> ImageBitmap?,
+    videos: VideoController?,
+    selected: Set<String>,
+) {
+    val grid = rememberLazyGridState()
+    LaunchedEffect(grid, controller) {
+        snapshotFlow {
+            val layout = grid.layoutInfo
+            (layout.visibleItemsInfo.lastOrNull()?.index ?: -1) to layout.totalItemsCount
+        }.collect { (last, total) -> if (last >= total - AHEAD) controller.loadMore() }
+    }
+    LazyVerticalGrid(
+        GridCells.Adaptive(104.dp),
+        Modifier.fillMaxSize(),
+        state = grid,
+        contentPadding = PaddingValues(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        months.forEach { month ->
+            item(key = month.path, span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    monthName(month),
+                    Modifier.padding(start = 8.dp, top = 16.dp, bottom = 4.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            items(month.entries, key = { it.path }) { entry ->
+                Tile(
+                    entry, controller, cover,
+                    onPlay = videos?.takeIf { it.canPlay(entry) }?.let { v -> { v.play(entry) } },
+                    selected = entry.path in selected,
+                    selecting = selected.isNotEmpty(),
+                    named = false,
+                )
+            }
+        }
+        if (more) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(24.dp))
+                }
+            }
+        }
+    }
+}
+
+/** Tiles still to come below the screen when the next month is asked for. */
+private const val AHEAD = 12
+
+private val MONTHS = listOf(
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)
+
+private fun monthName(month: TimelineMonth) =
+    "${MONTHS.getOrNull(month.month - 1) ?: month.month} ${month.year}"
+
+/**
  * A folder as a square: its picture, or its mark where it has none, and its
  * name under it -- the web's album grid. Tapping walks in, as a row does.
  */
@@ -283,6 +364,8 @@ private fun Tile(
     onPlay: (() -> Unit)? = null,
     selected: Boolean = false,
     selecting: Boolean = false,
+    /** Whether the name is written under it, which a timeline's tiles are not, as the web's are not. */
+    named: Boolean = true,
 ) {
     val picture by produceState<ImageBitmap?>(null, entry.path) { value = cover(entry) }
     val shape = RoundedCornerShape(8.dp)
@@ -312,6 +395,13 @@ private fun Tile(
             } else {
                 Symbol(markOf(entry), Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.displaySmall)
             }
+            if (!named && onPlay != null) {
+                Symbol(
+                    Glyph.PLAY,
+                    Modifier.align(Alignment.BottomStart).padding(4.dp).clearAndSetSemantics {},
+                    color = Color.White,
+                )
+            }
             if (selected) {
                 Symbol(
                     Glyph.SELECTED,
@@ -320,7 +410,9 @@ private fun Tile(
                 )
             }
         }
-        Text(entry.name, Modifier.padding(top = 6.dp), maxLines = 2, style = MaterialTheme.typography.bodyMedium)
+        if (named) {
+            Text(entry.name, Modifier.padding(top = 6.dp), maxLines = 2, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 

@@ -66,11 +66,11 @@ private sealed interface Screen {
  * cannot climb out of its own collection. Against any other server there is
  * one browser at the root and no bar.
  */
-private enum class Part(val glyph: String, val label: String, val floor: String) {
+private enum class Part(val glyph: String, val label: String, val floor: String, val timeline: Boolean = false) {
     Files(Glyph.FILES, "Files", "/files/"),
-    Photos(Glyph.PHOTOS, "Photos", "/photos/"),
+    Photos(Glyph.PHOTOS, "Photos", "/photos/", timeline = true),
     Music(Glyph.MUSIC, "Music", "/music/"),
-    Videos(Glyph.VIDEOS, "Videos", "/videos/"),
+    Videos(Glyph.VIDEOS, "Videos", "/videos/", timeline = true),
 }
 
 private const val TRASH = "/trash/"
@@ -232,7 +232,7 @@ private fun SignedIn(
         listed.clear()
         part = Part.Files
         parts = if (container.isStratusAtOrigin()) {
-            Part.entries.mapNotNull { p -> container.browser(scope, p.floor)?.let { p to it } }.toMap()
+            Part.entries.mapNotNull { p -> container.browser(scope, p.floor, p.timeline)?.let { p to it } }.toMap()
         } else {
             container.browser(scope)?.let { mapOf(Part.Files to it) }.orEmpty()
         }
@@ -415,13 +415,9 @@ private fun SignedIn(
                     videos = videos,
                     playOnTap = part == Part.Music || part == Part.Videos,
                     cover = { entry -> pictureOf(container, entry) },
-                    // Albums under an artist, and photographs and recordings
-                    // under a month: the places the web draws a grid.
-                    tiles = { path ->
-                        depth(path, Part.Music.floor) == 1 ||
-                            depth(path, Part.Photos.floor) == 2 ||
-                            depth(path, Part.Videos.floor) == 2
-                    },
+                    // Albums under an artist, the other place the web draws a
+                    // grid; Photos and Videos are timelines, which always are.
+                    tiles = { path -> depth(path, Part.Music.floor) == 1 },
                 )
             }
         }

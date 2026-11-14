@@ -12,7 +12,17 @@ data class BrowserState(
     val viewing: Viewing? = null,
     /** The paths ticked for deleting together; empty is not selecting at all. */
     val selected: Set<String> = emptySet(),
+    /** A timeline's months as far as it has been scrolled, newest first; [entries] is them end to end. */
+    val months: List<TimelineMonth> = emptyList(),
+    /** Whether a timeline has older months it has not loaded yet. */
+    val more: Boolean = false,
 )
+
+/** One month of a timeline: the collection it was listed from, and its files. */
+data class TimelineMonth(val path: String, val entries: List<DavResource>) {
+    val year: Int get() = path.trimEnd('/').substringBeforeLast('/').substringAfterLast('/').toIntOrNull() ?: 0
+    val month: Int get() = path.trimEnd('/').substringAfterLast('/').toIntOrNull() ?: 0
+}
 
 /**
  * Something the app will not do without being asked twice.

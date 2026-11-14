@@ -253,7 +253,7 @@ class AppContainer(
         return connections.to(instance)?.dav?.isStratusAtOrigin() == true
     }
 
-    suspend fun browser(scope: CoroutineScope, floor: String = "/"): BrowserController? {
+    suspend fun browser(scope: CoroutineScope, floor: String = "/", timeline: Boolean = false): BrowserController? {
         val instance = instances.instance() ?: return null
         val connection = connections.to(instance) ?: return null
         val credentials = instances.credentials() ?: return null
@@ -263,6 +263,7 @@ class AppContainer(
             scope,
             Sharing(ShareLinks(instance.baseUrl, credentials), sharing, linkSupportFor(instance)),
             floor,
+            timeline,
         )
     }
 

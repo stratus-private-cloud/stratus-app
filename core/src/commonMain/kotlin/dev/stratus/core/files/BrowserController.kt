@@ -40,6 +40,14 @@ class BrowserController(
      * or a section's collection on a Stratus, such as `/music/`.
      */
     val floor: String = "/",
+    /**
+     * A Stratus's `photos/` or `videos/`, drawn as one scroll of months
+     * rather than walked a year and a month at a time -- the web's gallery.
+     * It is still the same collections listed with `PROPFIND`, a month per
+     * request as the scroll reaches it, because the server refuses
+     * `Depth: infinity`.
+     */
+    val timeline: Boolean = false,
 ) {
     /** Whether there is anybody to share through, which the row menu asks. */
     val canShare: Boolean get() = sharing?.offered == true
@@ -68,7 +76,7 @@ class BrowserController(
                 path = STRATUS_HOME
             }
             mutable.value = mutable.value.copy(path = path)
-            load(path)
+            if (timeline) openTimeline(1) else load(path)
         }
     }
 
@@ -96,8 +104,105 @@ class BrowserController(
         mutable.value = mutable.value.copy(
             path = path, busy = true, failure = null, pending = null, viewing = null, selected = emptySet(),
         )
-        running = scope.launch { load(path) }
+        running = scope.launch { reload() }
     }
+
+    /** What is on screen asked for again: the folder, or as many months as were loaded. */
+    private suspend fun reload() {
+        if (timeline) openTimeline(mutable.value.months.size) else load(mutable.value.path)
+    }
+
+    /** The years not opened yet and the months of the open one not listed yet, newest first. */
+    private val yearsLeft = ArrayDeque<String>()
+    private val monthsLeft = ArrayDeque<String>()
+
+    /**
+     * Starts the timeline again from the newest month, and publishes it only
+     * once [months] of them are in: a refresh is the same scroll with whatever
+     * is new on top, not an empty screen that fills up again.
+     */
+    private suspend fun openTimeline(months: Int) {
+        try {
+            yearsLeft.clear()
+            monthsLeft.clear()
+            yearsLeft.addAll(newestFirst(dav.list(floor)))
+            val loaded = mutableListOf<TimelineMonth>()
+            while (loaded.size < maxOf(months, 1)) loaded += nextMonth() ?: break
+            mutable.value = mutable.value.copy(
+                months = loaded, entries = loaded.flatMap { it.entries }, more = moreLeft(), busy = false,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: DavError) {
+            mutable.value = mutable.value.copy(
+                busy = false, months = emptyList(), entries = emptyList(), more = false, failure = BrowserFailure.Listing(e),
+            )
+        } catch (e: Exception) {
+            mutable.value = mutable.value.copy(
+                busy = false, months = emptyList(), entries = emptyList(), more = false, failure = unreachable(e),
+            )
+        }
+    }
+
+    /**
+     * The next older month of the timeline, where the scroll has reached the
+     * end of what is loaded. Does nothing while anything else is running --
+     * the scroll asks again once that is done.
+     */
+    fun loadMore() {
+        val now = mutable.value
+        if (!timeline || !now.more || now.busy || running?.isActive == true) return
+        mutable.value = now.copy(busy = true, failure = null)
+        running = scope.launch {
+            try {
+                val month = nextMonth()
+                val state = mutable.value
+                mutable.value = state.copy(
+                    months = if (month == null) state.months else state.months + month,
+                    entries = if (month == null) state.entries else state.entries + month.entries,
+                    more = moreLeft(),
+                    busy = false,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: DavError) {
+                // What is loaded stays: it is still true, and the month that
+                // failed is still next for when somebody tries again.
+                mutable.value = mutable.value.copy(busy = false, failure = BrowserFailure.Listing(e))
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(busy = false, failure = unreachable(e))
+            }
+        }
+    }
+
+    /**
+     * Lists the next month with anything in it, opening years as they run
+     * out, or null at the oldest. A collection is taken off the queue only
+     * once it has been listed, so a failure leaves it next.
+     */
+    private suspend fun nextMonth(): TimelineMonth? {
+        while (true) {
+            val month = monthsLeft.firstOrNull()
+            if (month == null) {
+                val year = yearsLeft.firstOrNull() ?: return null
+                monthsLeft.addAll(newestFirst(dav.list(year)))
+                yearsLeft.removeFirst()
+                continue
+            }
+            // By name, newest first: the date a listing gives is when the file
+            // was written rather than taken, and the names a backup gives
+            // start with the moment of the photograph.
+            val files = dav.list(month).filter { !it.isDirectory }.sortedByDescending { it.name }
+            monthsLeft.removeFirst()
+            if (files.isNotEmpty()) return TimelineMonth(month, files)
+        }
+    }
+
+    private fun moreLeft() = yearsLeft.isNotEmpty() || monthsLeft.isNotEmpty()
+
+    /** A year's or a month's folders, which are numbers, newest first. */
+    private fun newestFirst(listing: List<DavResource>) =
+        listing.filter { it.isDirectory }.sortedByDescending { it.name.toIntOrNull() ?: -1 }.map { it.path }
 
     private suspend fun load(path: String) {
         try {
@@ -263,7 +368,7 @@ class BrowserController(
                 }
             }
             mutable.value = mutable.value.copy(selected = emptySet())
-            load(mutable.value.path)
+            reload()
             if (failure != null) mutable.value = mutable.value.copy(failure = failure)
         }
     }

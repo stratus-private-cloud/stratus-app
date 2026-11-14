@@ -46,7 +46,7 @@ internal object MultiStatus {
     }
 
     /** The properties of [MediaInfo], in the order they are asked for. */
-    private val INFO = listOf("taken", "width", "height", "camera", "location", "duration")
+    private val INFO = listOf("taken", "width", "height", "camera", "location", "place", "duration")
 
     fun infoBody(): String = buildString {
         append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")
@@ -84,6 +84,7 @@ internal object MultiStatus {
             camera = found["camera"],
             latitude = latitude.takeIf { longitude != null },
             longitude = longitude.takeIf { latitude != null },
+            place = found["place"],
             durationMs = found["duration"]?.toLongOrNull(),
         )
     }

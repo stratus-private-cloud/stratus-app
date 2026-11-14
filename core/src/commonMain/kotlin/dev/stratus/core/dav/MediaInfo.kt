@@ -14,5 +14,7 @@ data class MediaInfo(
     val camera: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    /** The nearest town and its country, which the server names from a table of its own (stratus-app#215). */
+    val place: String? = null,
     val durationMs: Long? = null,
 )

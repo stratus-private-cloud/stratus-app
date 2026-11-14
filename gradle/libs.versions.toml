@@ -14,6 +14,7 @@ lifecycleRuntime = "2.10.0"
 # and no platform. Same wall as Compose above; raise both when it appears.
 androidxCore = "1.18.0"
 androidxMediarouter = "1.8.1"
+androidxFragment = "1.9.1"
 media3 = "1.8.0"
 playServicesCast = "22.3.1"
 androidxTest = "1.7.0"
@@ -52,6 +53,9 @@ androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidxCore
 # from it directly.
 play-services-cast = { module = "com.google.android.gms:play-services-cast-framework", version.ref = "playServicesCast" }
 androidx-mediarouter = { module = "androidx.mediarouter:mediarouter", version.ref = "androidxMediarouter" }
+# Named only to raise it: the Cast framework asks for appcompat 1.0, which
+# brings fragment 1.1.0 from 2019, and Play's SDK index flags that version.
+androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "androidxFragment" }
 # The player (stratus-app#180): ExoPlayer, fetching through OkHttp so that a
 # pinned certificate is trusted as everywhere else, and the media session that
 # keeps it playing in the background and answers the lock screen.

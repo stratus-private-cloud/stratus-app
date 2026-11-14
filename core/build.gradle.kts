@@ -104,6 +104,7 @@ kotlin {
             // the app installs and runs there, and the button never appears.
             implementation(libs.play.services.cast)
             implementation(libs.androidx.mediarouter)
+            implementation(libs.androidx.fragment)
             implementation(libs.media3.exoplayer)
             implementation(libs.media3.datasource.okhttp)
             implementation(libs.media3.session)

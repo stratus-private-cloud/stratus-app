@@ -657,6 +657,7 @@ private fun DetailsDialog(details: Confirmation.Details, controller: BrowserCont
                 SelectionContainer {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         for ((label, value) in facts) Fact(label, value)
+                        info?.place?.let { Fact("Place", it) }
                         if (latitude != null && longitude != null) {
                             Fact("Location", "${coordinate(latitude)}, ${coordinate(longitude)}")
                         }

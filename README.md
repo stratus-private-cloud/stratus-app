@@ -265,9 +265,16 @@ each, so on a Stratus each is a line of its own in the trash -- and one the
 server refuses does not stop the rest.
 
 A row's menu has Details: its type, size, date, ETag and path, which is what
-the listing already knew -- so on a Stratus it is the web UI's Details without
-the half the indexer reads, a camera or a track's tags, which WebDAV has no
-property for.
+the listing already knew -- and on a Stratus the half its indexer read, asked
+for when the dialog opens: when a photograph was taken or a recording made,
+its dimensions, the camera, how long it lasts and where it was, with a button
+that opens the place in the phone's maps app. Nothing about the place is
+looked up; the coordinates leave the phone only for the maps app, when that
+button is pressed. The photo viewer has the same Details behind ⓘ, and a tile
+in Photos or Videos, which has no menu, shows it when it is the only one
+selected. The indexer's half is Stratus's own properties
+(stratus-backend#502); any other server answers without them and the dialog
+is what the listing knew.
 
 What is not there yet: the trash can be looked through and copied out of but
 not restored from (stratus-app#179).

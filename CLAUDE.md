@@ -401,6 +401,17 @@ Three surfaces, and no more than three:
    a second API; against any other server, or a Stratus pointed below its
    origin, there is one browser where it was pointed and no bar.
 
+   **Details carry the indexer's half on a Stratus** (stratus-backend#502):
+   `taken`, `width`, `height`, `camera`, `location` and `duration` in the
+   server's namespace, asked with one `Depth: 0` `PROPFIND` naming them when
+   the dialog opens -- the server answers them only when named, so the
+   listing never pays for them. The same request goes to any server and
+   comes back as 404s, which is an empty `MediaInfo` rather than a question
+   asked first. It runs outside `running`, as `original` does, and lands in
+   `Confirmation.Details` only if that dialog is still the one open. `taken`
+   is the camera's clock with no zone and is shown in none (`wallClock`); the
+   location is coordinates and a maps link, never a lookup (stratus-app#215).
+
    **Photos and Videos are timelines**, as the web's gallery is: one scroll,
    newest first, a heading per month, instead of a year and a month to walk
    into. It is still `BrowserController` -- `timeline` changes how it lists

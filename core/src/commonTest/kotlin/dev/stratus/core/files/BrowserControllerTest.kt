@@ -489,6 +489,54 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun aFilesDetailsAskWhatTheIndexerRead() = runTest {
+        val browser = controller(this) { request ->
+            if (request.headers[io.ktor.http.HttpHeaders.Depth] == "0") {
+                HttpStatusCode.MultiStatus to """<multistatus xmlns="DAV:"><response><href>/files/a.jpg</href><propstat><prop>""" +
+                    """<camera xmlns="https://github.com/C0piIot/stratus">Pixel 9</camera>""" +
+                    """</prop><status>HTTP/1.1 200 OK</status></propstat></response></multistatus>"""
+            } else {
+                HttpStatusCode.MultiStatus to listing("/files/a.jpg" to false, "/files/album" to true)
+            }
+        }
+        browser.start()
+        browser.settled()
+        val (folder, photo) = browser.state.value.entries
+        seen.clear()
+
+        browser.details(photo)
+        assertEquals(true, (browser.state.value.pending as Confirmation.Details).looking)
+        val answered = browser.state.first { (it.pending as? Confirmation.Details)?.looking == false }.pending
+        assertEquals("Pixel 9", (answered as Confirmation.Details).info?.camera)
+        assertEquals("/files/a.jpg", seen.single().url.encodedPath)
+
+        // A folder has nothing for the indexer to have read, so nothing is asked.
+        seen.clear()
+        browser.details(folder)
+        assertEquals(Confirmation.Details(folder), browser.state.value.pending)
+        assertEquals(emptyList(), seen.map { it.method.value })
+    }
+
+    @Test
+    fun detailsTheServerCannotAddToAreStillTheListings() = runTest {
+        val browser = controller(this) { request ->
+            if (request.headers[io.ktor.http.HttpHeaders.Depth] == "0") {
+                HttpStatusCode.InternalServerError to ""
+            } else {
+                HttpStatusCode.MultiStatus to listing("/files/a.jpg" to false)
+            }
+        }
+        browser.start()
+        browser.settled()
+        val photo = browser.state.value.entries.single()
+
+        browser.details(photo)
+        val answered = browser.state.first { (it.pending as? Confirmation.Details)?.looking == false }.pending
+        assertEquals(Confirmation.Details(photo), answered)
+        assertNull(browser.state.value.failure)
+    }
+
+    @Test
     fun sharingHandsTheSystemALinkAndNothingGoesToTheServer() = runTest {
         val browser = controller(this, answer = listingOf("/files/photos/a.txt" to false))
         browser.start()

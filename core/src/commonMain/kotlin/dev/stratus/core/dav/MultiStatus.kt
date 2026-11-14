@@ -45,6 +45,68 @@ internal object MultiStatus {
         )
     }
 
+    /** The properties of [MediaInfo], in the order they are asked for. */
+    private val INFO = listOf("taken", "width", "height", "camera", "location", "duration")
+
+    fun infoBody(): String = buildString {
+        append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")
+        append("<propfind xmlns=\"DAV:\"><prop>")
+        for (name in INFO) append("<").append(name).append(" xmlns=\"").append(STRATUS).append("\"/>")
+        append("</prop></propfind>")
+    }
+
+    /**
+     * The first response's [MediaInfo], from its successful propstats only: a
+     * server that has none of them says so with a 404 block, which is not a
+     * value.
+     */
+    fun parseInfo(xml: String): MediaInfo {
+        val found = mutableMapOf<String, String>()
+        try {
+            val reader = xmlStreaming.newReader(xml)
+            while (reader.hasNext()) {
+                if (reader.next() == EventType.START_ELEMENT && reader.isDav("response")) {
+                    reader.eachChild { ns, name ->
+                        if (ns == DAV && name == "propstat") reader.readInfoPropstat(found) else reader.skipElement()
+                    }
+                    break
+                }
+            }
+        } catch (e: Exception) {
+            throw DavError.Malformed(e.message ?: "invalid XML")
+        }
+        val (latitude, longitude) = found["location"]?.trim()?.split(' ').orEmpty()
+            .map { it.toDoubleOrNull() }.let { it.getOrNull(0) to it.getOrNull(1) }
+        return MediaInfo(
+            taken = found["taken"],
+            width = found["width"]?.toIntOrNull(),
+            height = found["height"]?.toIntOrNull(),
+            camera = found["camera"],
+            latitude = latitude.takeIf { longitude != null },
+            longitude = longitude.takeIf { latitude != null },
+            durationMs = found["duration"]?.toLongOrNull(),
+        )
+    }
+
+    private fun XmlReader.readInfoPropstat(into: MutableMap<String, String>) {
+        val values = mutableMapOf<String, String>()
+        var usable = false
+        eachChild { ns, name ->
+            when {
+                ns == DAV && name == "prop" -> eachChild { propNs, prop ->
+                    if (propNs == STRATUS && prop in INFO) {
+                        textOfElement().trim().takeIf { it.isNotEmpty() }?.let { values[prop] = it }
+                    } else {
+                        skipElement()
+                    }
+                }
+                ns == DAV && name == "status" -> usable = isSuccessStatusLine(textOfElement())
+                else -> skipElement()
+            }
+        }
+        if (usable) into.putAll(values)
+    }
+
     private fun entries(xml: String, basePath: String): List<Entry> {
         val out = mutableListOf<Entry>()
         try {

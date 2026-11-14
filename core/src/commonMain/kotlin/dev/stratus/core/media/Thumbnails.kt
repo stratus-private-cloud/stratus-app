@@ -55,6 +55,12 @@ sealed interface Thumbnail {
  *   nothing is sent at all, so one refusal costs one request rather than one
  *   per row.
  *
+ * **It remembers what it was given**, up to [keepBytes] of JPEG, so that
+ * scrolling back over a grid draws from memory rather than asking again. The
+ * address is signed per second, so nothing below this -- no HTTP cache --
+ * could ever have recognised a second request as the first. Keyed by the
+ * file's ETag where the listing gave one, so an overwrite is a new picture.
+ *
  * It is the one piece here that knows it may be talking to a Stratus, and it
  * costs nothing to be wrong about: `/thumb/` on anything else answers something
  * that is not an image, which is [Thumbnail.None] and an icon. `Retry-After` is
@@ -64,23 +70,28 @@ class Thumbnails(
     private val instances: ServerStore,
     private val connections: Connections,
     atOnce: Int = AT_ONCE,
+    private val keepBytes: Long = KEEP_BYTES,
     private val now: () -> Long = { getTimeMillis() },
 ) {
     private val slots = Semaphore(atOnce)
     private val lock = Mutex()
     private var closedUntil = 0L
+    private val kept = LinkedHashMap<String, Thumbnail.Picture>()
+    private var keptBytes = 0L
 
     /**
      * A listed file's picture, asked for where it really is: one in a
      * generated collection -- `/videos/`, `/photos/` -- has a signable address
      * only under `/files/`, which the listing gives as [DavResource.source].
      */
-    suspend fun of(entry: DavResource, width: Int): Thumbnail = of(entry.source ?: entry.path, width)
+    suspend fun of(entry: DavResource, width: Int): Thumbnail = of(entry.source ?: entry.path, width, entry.etag)
 
     /** [path] is as WebDAV gives it, leading slash and all. */
-    suspend fun of(path: String, width: Int): Thumbnail {
-        left()?.let { return it }
+    suspend fun of(path: String, width: Int, etag: String? = null): Thumbnail {
         val instance = instances.instance() ?: return Thumbnail.None
+        val key = "${instance.baseUrl} $path $width ${etag.orEmpty()}"
+        recall(key)?.let { return it }
+        left()?.let { return it }
         val credentials = instances.credentials() ?: return Thumbnail.None
         val connection = connections.to(instance) ?: return Thumbnail.None
         val url = ShareLinks(instance.baseUrl, credentials)
@@ -89,7 +100,7 @@ class Thumbnails(
             // Asked again in here because waiting for a permit is where most of
             // a bound grid's requests spend their time, and the door may have
             // shut while they did.
-            left() ?: fetch(connection.http, url)
+            recall(key) ?: left() ?: keep(key, fetch(connection.http, url))
         }
     }
 
@@ -99,11 +110,32 @@ class Thumbnails(
      * its files. Under the same permits and the same refusal as a thumbnail.
      */
     suspend fun cover(album: String, width: Int): Thumbnail {
-        left()?.let { return it }
         val instance = instances.instance() ?: return Thumbnail.None
+        val key = "${instance.baseUrl} $album ?cover=$width"
+        recall(key)?.let { return it }
+        left()?.let { return it }
         val connection = connections.to(instance) ?: return Thumbnail.None
         val url = instance.baseUrl.trimEnd('/') + DavPath.encodePath(album.trimEnd('/')) + "/?cover=$width"
-        return slots.withPermit { left() ?: fetch(connection.http, url) }
+        return slots.withPermit { recall(key) ?: left() ?: keep(key, fetch(connection.http, url)) }
+    }
+
+    private suspend fun recall(key: String): Thumbnail.Picture? = lock.withLock {
+        // Taken out and put back so that iteration order is least recently used first.
+        kept.remove(key)?.also { kept[key] = it }
+    }
+
+    private suspend fun keep(key: String, answer: Thumbnail): Thumbnail {
+        if (answer !is Thumbnail.Picture || answer.bytes.size > keepBytes) return answer
+        lock.withLock {
+            kept.put(key, answer)?.let { keptBytes -= it.bytes.size }
+            keptBytes += answer.bytes.size
+            val oldest = kept.entries.iterator()
+            while (keptBytes > keepBytes && oldest.hasNext()) {
+                keptBytes -= oldest.next().value.bytes.size
+                oldest.remove()
+            }
+        }
+        return answer
     }
 
     private suspend fun fetch(http: HttpClient, url: String): Thumbnail = try {
@@ -152,6 +184,10 @@ class Thumbnails(
 
     companion object {
         const val AT_ONCE = 4
+
+        // A 300-pixel JPEG from a Stratus is 15-30 KB, so this is several
+        // hundred tiles: a few screens of scrolling back.
+        const val KEEP_BYTES = 16L * 1024 * 1024
         private const val DEFAULT_WAIT = 5_000L
         private const val LONGEST_WAIT = 30_000L
     }

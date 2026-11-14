@@ -42,6 +42,7 @@ class ThumbnailsTest {
 
     private suspend fun thumbnails(
         type: String = "image/jpeg",
+        keepBytes: Long = Thumbnails.KEEP_BYTES,
         answer: suspend (HttpRequestData) -> Pair<HttpStatusCode, String>,
     ): Thumbnails {
         val engine = MockEngine { request ->
@@ -58,7 +59,7 @@ class ThumbnailsTest {
         val instances = ServerStore(MemoryStore())
         instances.put(Server("http://host/", "edu"), Credentials("edu", "secret"))
         val connections = Connections { Connection(http, DavClient(http, it.baseUrl)) }
-        return Thumbnails(instances, connections) { clock }
+        return Thumbnails(instances, connections, keepBytes = keepBytes) { clock }
     }
 
     @Test
@@ -159,5 +160,42 @@ class ThumbnailsTest {
             held.complete(Unit)
             assertTrue(asking.awaitAll().all { it is Thumbnail.Picture })
         }
+    }
+
+    @Test
+    fun aPictureAlreadyGivenIsNotAskedForAgain() = runTest {
+        // Scrolling back over a grid re-asked for every tile: the address is
+        // signed per second, so nothing below this could tell it was the same.
+        val thumbs = thumbnails { HttpStatusCode.OK to "jpeg" }
+        thumbs.of(DavResource("/files/a.jpg", isDirectory = false, etag = "\"1\""), 300)
+        clock += 60_000
+        assertIs<Thumbnail.Picture>(thumbs.of(DavResource("/files/a.jpg", isDirectory = false, etag = "\"1\""), 300))
+        assertEquals(1, seen.size)
+
+        // An overwrite is another ETag and so another picture.
+        thumbs.of(DavResource("/files/a.jpg", isDirectory = false, etag = "\"2\""), 300)
+        assertEquals(2, seen.size)
+    }
+
+    @Test
+    fun whatIsKeptIsBounded() = runTest {
+        val thumbs = thumbnails(keepBytes = 8) { HttpStatusCode.OK to "jpeg" }
+        thumbs.of("/files/a.jpg", 300)
+        thumbs.of("/files/b.jpg", 300)
+        thumbs.of("/files/c.jpg", 300)
+        thumbs.of("/files/c.jpg", 300)
+        assertEquals(3, seen.size)
+        thumbs.of("/files/a.jpg", 300)
+        assertEquals(4, seen.size)
+    }
+
+    @Test
+    fun aRefusalIsNotKept() = runTest {
+        var full = true
+        val thumbs = thumbnails { if (full) HttpStatusCode.ServiceUnavailable to "1" else HttpStatusCode.OK to "jpeg" }
+        assertIs<Thumbnail.NotNow>(thumbs.of("/files/a.jpg", 300))
+        full = false
+        clock += 1_000
+        assertIs<Thumbnail.Picture>(thumbs.of("/files/a.jpg", 300))
     }
 }

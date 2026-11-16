@@ -1060,6 +1060,15 @@ where granting the photo permission is what flips it. Write the `if`. Only the
 emulator suite ever sees this, and only at the moment the activity is
 destroyed.
 
+**And an effect in `App.kt` is a `MainEffect`, not a `LaunchedEffect`**
+(stratus-app#206). A `LaunchedEffect` resumes wherever its I/O ended, and
+under the suite's `TestMonotonicFrameClock` the frame a state write schedules
+is composed on that same thread -- the other cause of that torn slot table,
+and the one #85 named and left. A probe on the folders screen caught it
+composing on `DefaultDispatcher-worker-*` in 2 of 40 runs of one test, and in
+none of 40 with the effects pinned. Production composes on the main looper
+whatever happens, so this is the harness's; pinning is right regardless.
+
 There is one qualification to all of that, with a sting in it: **the iOS source
 sets compile on Linux -- but only on x86_64.** Kotlin/Native does not support
 `linux-aarch64` as a host at all, so on the ARM development box every Apple

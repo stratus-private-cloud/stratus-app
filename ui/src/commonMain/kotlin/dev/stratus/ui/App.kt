@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -103,7 +105,7 @@ fun App(
     val editing by signIn.editing.collectAsState()
     val canGoBack by signIn.canGoBack.collectAsState()
 
-    LaunchedEffect(Unit) { signIn.restore() }
+    MainEffect(Unit) { signIn.restore() }
 
     StratusTheme {
         // Android has drawn edge to edge without asking since targetSdk 35, and
@@ -205,7 +207,7 @@ private fun SignedIn(
     var canSearch by remember { mutableStateOf(false) }
     var calendars by remember { mutableStateOf<CalendarSetup?>(null) }
 
-    LaunchedEffect(Unit) { signedIn.start() }
+    MainEffect(Unit) { signedIn.start() }
 
     // The part a shortcut asked for, taken once it can be shown. Opened from
     // the launcher the app arrives before the server has said which parts it
@@ -217,7 +219,7 @@ private fun SignedIn(
         return wanted
     }
     val opened by shortcuts.opened.collectAsState()
-    LaunchedEffect(opened) { takeOpened()?.let(::show) }
+    MainEffect(opened) { takeOpened()?.let(::show) }
 
     // Rebuilt when the server changes, and only then -- which excludes the
     // moment before the controller has read it: built then as well, the root
@@ -227,8 +229,8 @@ private fun SignedIn(
     // server alike: either way the parts are not known until it comes back.
     DisposableEffect(Unit) { onDispose { shortcuts.offer(emptyList()) } }
 
-    LaunchedEffect(baseUrl, state.server) {
-        if (state.server == null) return@LaunchedEffect
+    MainEffect(baseUrl, state.server) {
+        if (state.server == null) return@MainEffect
         listed.clear()
         part = Part.Files
         parts = if (container.isStratusAtOrigin()) {
@@ -250,7 +252,7 @@ private fun SignedIn(
         calendars = container.calendarSetup()
     }
 
-    LaunchedEffect(search) {
+    MainEffect(search) {
         canSearch = false
         search?.state?.collect { canSearch = it.offered == true }
     }
@@ -265,7 +267,7 @@ private fun SignedIn(
     // changed -- in the system settings, or the dialog, which pauses the app
     // while it is up -- which is what resumed() is for (stratus-app#75).
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(Unit) {
+    MainEffect(Unit) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             signedIn.resumed()
             while (true) {
@@ -329,7 +331,7 @@ private fun SignedIn(
         }
 
         is Screen.Sources -> {
-            LaunchedEffect(Unit) { signedIn.openingFolders() }
+            MainEffect(Unit) { signedIn.openingFolders() }
             SourcesScreen(
                 available = state.folders,
                 access = state.access,
@@ -455,3 +457,12 @@ private suspend fun pictureOf(container: AppContainer, entry: DavResource): Imag
 // only the first two ahead, so 320 was a 1200-pixel decode per film on demand
 // -- seconds on one CPU, and the tile gave up before it arrived.
 private const val TILE_PIXELS = 300
+
+// A LaunchedEffect runs on the composition's own dispatcher and resumes
+// wherever its I/O ended, so the state it writes afterwards is written there
+// -- and under the test clock that is where the next frame is composed
+// (stratus-app#206, the half #85 left). Pinned for the reason the scopes are.
+@Composable
+private fun MainEffect(vararg keys: Any?, block: suspend CoroutineScope.() -> Unit) {
+    LaunchedEffect(*keys) { withContext(Dispatchers.Main.immediate, block) }
+}

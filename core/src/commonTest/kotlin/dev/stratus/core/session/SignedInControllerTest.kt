@@ -14,6 +14,9 @@ import dev.stratus.core.server.ServerStore
 import dev.stratus.core.net.Credentials
 import dev.stratus.core.store.ReportingConsent
 import dev.stratus.core.store.SecureStore
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.RawSource
 import kotlin.test.Test
@@ -24,7 +27,16 @@ import kotlin.test.assertTrue
 
 private class SessionMemoryStore : SecureStore {
     private val kept = mutableMapOf<String, String>()
-    override suspend fun read(key: String) = kept[key]
+    private var held: CompletableDeferred<Unit>? = null
+
+    /** The next read answers with what is there now, but only once [gate] opens. */
+    fun holdNextRead(gate: CompletableDeferred<Unit>) { held = gate }
+
+    override suspend fun read(key: String): String? {
+        val answer = kept[key]
+        held?.let { held = null; it.await() }
+        return answer
+    }
     override suspend fun write(key: String, value: String) { kept[key] = value }
     override suspend fun delete(key: String) { kept.remove(key) }
 }
@@ -175,5 +187,27 @@ class SignedInControllerTest {
 
         assertTrue(signedOut)
         assertNull(controller.state.value.server)
+    }
+
+    // stratus-app#220: the once-a-second poll read the server just before the
+    // wifi switch was turned off, and published what it read just after --
+    // so the switch went back on until the next poll.
+    @Test
+    fun aPollThatReadBeforeTheSwitchDoesNotPutTheOldValueBack() = runTest {
+        signedIn()
+        controller.start()
+        assertTrue(controller.state.value.server!!.onlyOnWifi)
+
+        val gate = CompletableDeferred<Unit>()
+        store.holdNextRead(gate)
+        val poll = launch { controller.refresh() }
+        runCurrent()
+        val switch = launch { controller.setOnlyOnWifi(false) }
+        runCurrent()
+        gate.complete(Unit)
+        poll.join()
+        switch.join()
+
+        assertFalse(controller.state.value.server!!.onlyOnWifi)
     }
 }

@@ -21,6 +21,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlin.test.Test
@@ -38,6 +40,11 @@ private class MemoryStore : SecureStore {
 class ThumbnailsTest {
 
     private val seen = mutableListOf<HttpRequestData>()
+
+    // The engine answers on several threads at once in onlySoManyGoOutAtOnce,
+    // and a list written from two of them loses entries -- or, on Kotlin/Native,
+    // throws, which is a NotNow where a Picture was asserted (stratus-app#173).
+    private val seenLock = Mutex()
     private var clock = 1_700_000_000_000L
 
     private suspend fun thumbnails(
@@ -46,7 +53,7 @@ class ThumbnailsTest {
         answer: suspend (HttpRequestData) -> Pair<HttpStatusCode, String>,
     ): Thumbnails {
         val engine = MockEngine { request ->
-            seen += request
+            seenLock.withLock { seen += request }
             val (status, body) = answer(request)
             val headers = when {
                 status == HttpStatusCode.ServiceUnavailable -> headersOf("Retry-After", body)

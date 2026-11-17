@@ -4,6 +4,8 @@ import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
+import androidx.work.WorkManager
+import dev.stratus.core.backup.BackupWorker
 import org.junit.Test
 import kotlin.random.Random
 import kotlin.test.assertEquals
@@ -41,6 +43,25 @@ class BackupTest : E2E() {
         return assertNotNull(found)
     }
 
+    /** Does [action], then waits until the pass it enqueued, and any before it, has run. */
+    private fun afterThePassItStarts(action: () -> Unit) {
+        val work = WorkManager.getInstance(Phone.context)
+        fun passes() = work.getWorkInfosForUniqueWork(BackupWorker.ONCE).get()
+        val before = passes().map { it.id }.toSet()
+        action()
+        try {
+            ui.waitUntil(60_000) {
+                val now = passes()
+                now.any { it.id !in before } && now.all { it.state.isFinished }
+            }
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError(
+                "the pass never finished: ${passes().map { it.state }}, and the app showed:\n${screen()}",
+                e,
+            )
+        }
+    }
+
     @Test
     fun aPhotographEndsUpOnTheServerWithAllItsBytes() {
         val bytes = Random.nextBytes(64_000)
@@ -76,10 +97,12 @@ class BackupTest : E2E() {
 
         Stratus.delete(path)
         // Already on the backup screen, so the strip is not there to be tapped
-        // a second time -- only the button is.
-        tap("Back up now")
-        // The pass has to have finished before absence means anything.
-        see("Everything is backed up", timeoutMs = 60_000)
+        // a second time -- only the button is. The pass has to have finished
+        // before absence means anything, and it is waited for as a pass rather
+        // than as the strip's wording: that read "Backed up 1 photograph"
+        // whenever the tap landed while the first pass was still closing
+        // (stratus-app#188).
+        afterThePassItStarts { tap("Back up now") }
 
         assertTrue(
             Stratus.backedUp("$unique.jpg") == null,

@@ -98,7 +98,8 @@ class BackupWorker(
         private const val CHANNEL = "backup"
         private const val NOTIFICATION = 1
         private const val PERIODIC = "stratus-backup"
-        private const val ONCE = "stratus-backup-now"
+        /** Public for the end-to-end suite, which waits on the pass it asked for. */
+        const val ONCE = "stratus-backup-now"
         private const val ON_WIFI = "stratus-backup-on-wifi"
 
         /**
@@ -139,11 +140,19 @@ class BackupWorker(
             )
         }
 
-        /** Runs a pass now, for somebody who does not want to wait six hours. */
+        /**
+         * Runs a pass now, for somebody who does not want to wait six hours.
+         *
+         * Appended rather than kept: with `KEEP` a tap during a pass was
+         * dropped without a word, and that pass had already looked at the
+         * camera roll -- so the photograph just taken, which is why anybody
+         * taps, waited six hours (stratus-app#188). A pass with nothing new is
+         * a listing of the roll and no request, so a few taps cost nothing.
+         */
         fun now(context: Context) {
             WorkManager.getInstance(context).enqueueUniqueWork(
                 ONCE,
-                androidx.work.ExistingWorkPolicy.KEEP,
+                androidx.work.ExistingWorkPolicy.APPEND_OR_REPLACE,
                 OneTimeWorkRequestBuilder<BackupWorker>().build(),
             )
         }

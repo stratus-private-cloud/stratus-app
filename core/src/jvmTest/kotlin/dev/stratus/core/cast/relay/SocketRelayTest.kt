@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import java.net.ConnectException
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URI
 import kotlin.test.Test
@@ -111,10 +112,17 @@ class SocketRelayTest {
 
     @Test
     fun withdrawingStopsListening() = runTest {
-        val relay = SocketRelay(upstream, backgroundScope) { "127.0.0.1" }
-        val local = assertNotNull(relay.publish("https://s.example/files/f.mp4?k=signed", "127.0.0.1"))
-        relay.withdraw()
-        assertFailsWith<ConnectException> { fetch(local) }
+        // Many times, because the socket used to go on listening for a moment
+        // after withdraw returned, about once in a hundred, and the connection
+        // it took then was never answered (stratus-app#175).
+        repeat(500) {
+            val relay = SocketRelay(upstream, backgroundScope) { "127.0.0.1" }
+            val local = URI(assertNotNull(relay.publish("https://s.example/files/f.mp4?k=signed", "127.0.0.1")))
+            relay.withdraw()
+            assertFailsWith<ConnectException> {
+                withContext(Dispatchers.IO) { Socket().use { it.connect(InetSocketAddress(local.host, local.port), 2_000) } }
+            }
+        }
     }
 
     @Test

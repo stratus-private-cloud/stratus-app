@@ -9,8 +9,10 @@ import io.ktor.http.HttpMethod
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -66,17 +68,22 @@ class SocketRelay(
                 } catch (_: Exception) {
                     break
                 }
-                launch { serve(client) }
+                // Started even if the loop was cancelled meanwhile: a client
+                // accepted here is closed by serve, never left open unanswered.
+                launch(start = CoroutineStart.ATOMIC) { serve(client) }
             }
         }
         socket
     }
 
-    private fun stop() {
-        accepting?.cancel()
-        accepting = null
+    // The JDK closes a listening socket for real only once the thread in
+    // accept() has left it, and until then it still takes connections -- so
+    // withdrawing waits for that thread (stratus-app#175).
+    private suspend fun stop() {
         server?.close()
         server = null
+        accepting?.cancelAndJoin()
+        accepting = null
     }
 
     private suspend fun serve(client: Socket) = client.use {

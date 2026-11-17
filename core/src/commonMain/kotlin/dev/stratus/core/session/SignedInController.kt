@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** What the platform is asked to request, together, since it can only show one request at a time. */
 enum class Ask { Photos, Notifications }
@@ -55,6 +57,12 @@ class SignedInController(
 
     private var accessRead = false
 
+    // A refresh reads the server and publishes it later, and the poll runs one
+    // every second -- so one that read before a write published after it and
+    // put the old value back on screen (stratus-app#220). Writes and refreshes
+    // take turns.
+    private val turns = Mutex()
+
     /** Once, when the screens first appear. */
     suspend fun start() {
         mutable.update { it.copy(reporting = consent.granted()) }
@@ -68,7 +76,7 @@ class SignedInController(
     }
 
     /** One pass of the status poll, which only runs while the app is in front. */
-    suspend fun refresh() {
+    suspend fun refresh() = turns.withLock {
         val server = instances.instance()
         val state = if (server == null) BackupState.NeverRun else backup.status.of()
         val failures = if (server == null) emptyList() else backup.failures()
@@ -104,7 +112,7 @@ class SignedInController(
                 if (Ask.Notifications in needed) notificationsAsked.remember()
             }
         }
-        backup.setSources(sources)
+        turns.withLock { backup.setSources(sources) }
         refresh()
     }
 
@@ -116,13 +124,13 @@ class SignedInController(
      * go, and six hours later is not an answer.
      */
     suspend fun setOnlyOnWifi(only: Boolean) {
-        backup.setOnlyOnWifi(only)
+        turns.withLock { backup.setOnlyOnWifi(only) }
         if (!only) backUpNow()
         refresh()
     }
 
     suspend fun signOut() {
-        signOut.invoke()
+        turns.withLock { signOut.invoke() }
         refresh()
     }
 

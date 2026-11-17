@@ -274,7 +274,14 @@ abstract class E2E {
      */
     private fun spendMobileData() {
         tap("Only back up on wifi")
-        ui.onNode(hasText("Only back up on wifi") and hasClickAction()).assertIsOff()
+        // Waited for: the switch shows what was written, and the write is a
+        // disk away from the tap (stratus-app#220).
+        val switch = ui.onNode(hasText("Only back up on wifi") and hasClickAction())
+        try {
+            ui.waitUntil(5_000) { runCatching { switch.assertIsOff() }.isSuccess }
+        } catch (e: ComposeTimeoutException) {
+            switch.assertIsOff()
+        }
     }
 
     /** On the backup screen already, which is where every caller of this is. */

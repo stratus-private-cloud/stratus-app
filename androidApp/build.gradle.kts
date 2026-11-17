@@ -115,6 +115,8 @@ dependencies {
     // app's own WebDAV client rather than a second one to keep in step.
     androidTestImplementation(libs.ktor.client.core)
     androidTestImplementation(libs.ktor.client.okhttp)
+    // To wait for the backup pass a test asked for, not for a sentence about it.
+    androidTestImplementation(libs.androidx.work)
     androidTestUtil(libs.androidx.test.orchestrator)
     androidTestUtil(libs.androidx.test.services)
     debugImplementation(libs.compose.ui.test.manifest)

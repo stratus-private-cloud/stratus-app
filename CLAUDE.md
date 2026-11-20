@@ -424,6 +424,16 @@ Three surfaces, and no more than three:
    `getlastmodified` is when the file was written rather than taken and a
    backup's names begin with the moment of the photograph.
 
+   **And Photos begins with the people** when the server has any
+   (stratus-backend#519): `people/` listed once with the gallery, a few faces
+   from it as the first full-width item of the scroll -- the named first, by
+   `bannerPeople` -- and a screen of its own behind them, a browser floored at
+   `people/` like Trash. A person's picture is `?cover` on their folder
+   (stratus-backend#541), the album cover's twin, fetched by the same
+   `Thumbnails.cover`; against a server without it the circle keeps its mark.
+   Read-only on purpose: naming, merging and taking a face out have no WebDAV
+   verb, and an app that needed one would need a private API.
+
    **Music plays in the app** (stratus-app#180), behind a `Player` each
    platform implements and a `MusicController` in common code that turns a
    folder into a queue of signed links -- the cast's links, so the player

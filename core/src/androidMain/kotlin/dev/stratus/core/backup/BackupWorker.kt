@@ -5,10 +5,13 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.provider.MediaStore
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
@@ -24,9 +27,10 @@ import java.util.concurrent.TimeUnit
  * **It executes and decides nothing.** What goes next, what is retried and when
  * to give up are [UploadQueue]'s, and they are there because this is the half
  * that runs where no test can watch it. What is decided here is only how to
- * survive Android: a foreground service for the duration, because background
- * work that is not in the foreground is killed by OEM battery managers however
- * correct it is, and stopping between files when the system asks.
+ * survive Android: a foreground service for the duration where Android allows
+ * one, because background work that is not in the foreground is killed by OEM
+ * battery managers however correct it is, and stopping between files when the
+ * system asks.
  */
 class BackupWorker(
     context: Context,
@@ -37,18 +41,20 @@ class BackupWorker(
         val backup = appContainer(applicationContext).backup
         if (backup.enabled() == null) return Result.success()
 
-        setForeground(getForegroundInfo())
+        val foreground = intoTheForeground()
 
         val outcome = backup.pass(
             // Asked between files, so being reclaimed costs nothing: the queue
             // is in the database and picks up where it stopped.
             keepGoing = { !isStopped },
             onStep = { step ->
-                if (step is QueueStep.Uploaded) {
+                if (foreground && step is QueueStep.Uploaded) {
                     setForegroundAsync(notify(step.path.substringAfterLast('/')))
                 }
             },
         )
+
+        if (NEW_MEDIA in tags) watchForNewMedia(applicationContext, ExistingWorkPolicy.APPEND_OR_REPLACE)
 
         // Coming back later is WorkManager's job; whether there is a reason to
         // is the queue's, and which item is ready is the queue's too. The two
@@ -64,6 +70,24 @@ class BackupWorker(
             }
             PassOutcome.Finished -> Result.success()
         }
+    }
+
+    /**
+     * Whether the pass runs as a foreground service, which outlives a battery
+     * manager; without one it still has the ten minutes any job gets, and the
+     * queue picks up where it stopped.
+     *
+     * Android 12 refuses a foreground service started from the background,
+     * which is every pass nobody tapped for -- and it refuses by throwing. Not
+     * catching it was a backup that only ever ran with the app open, and that
+     * nobody could see fail: WorkManager keeps the exception to itself.
+     */
+    internal suspend fun intoTheForeground(): Boolean = try {
+        setForeground(getForegroundInfo())
+        true
+    } catch (refused: IllegalStateException) {
+        Log.i(LOG, "running without a foreground service: ${refused.message}")
+        false
     }
 
     /**
@@ -101,6 +125,8 @@ class BackupWorker(
         /** Public for the end-to-end suite, which waits on the pass it asked for. */
         const val ONCE = "stratus-backup-now"
         private const val ON_WIFI = "stratus-backup-on-wifi"
+        private const val NEW_MEDIA = "stratus-backup-on-new-media"
+        private const val LOG = "StratusBackup"
 
         /**
          * Asks Android to come back regularly.
@@ -119,6 +145,34 @@ class BackupWorker(
                     )
                     .build(),
             )
+            watchForNewMedia(context, ExistingWorkPolicy.KEEP)
+        }
+
+        /**
+         * Runs a pass when the camera roll changes, so a photograph does not
+         * wait for the six hours.
+         *
+         * A content trigger fires once, so the pass it starts arms the next
+         * one, appended behind itself: replacing would cancel the very pass
+         * doing the arming. Opening the app keeps whatever is armed.
+         */
+        internal fun watchForNewMedia(context: Context, policy: ExistingWorkPolicy) {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                NEW_MEDIA,
+                policy,
+                OneTimeWorkRequestBuilder<BackupWorker>()
+                    .addTag(NEW_MEDIA)
+                    .setConstraints(
+                        Constraints.Builder()
+                            .setRequiredNetworkType(NetworkType.CONNECTED)
+                            .addContentUriTrigger(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true)
+                            .addContentUriTrigger(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true)
+                            // A burst of photographs is one pass, not one each.
+                            .setTriggerContentUpdateDelay(1, TimeUnit.MINUTES)
+                            .build(),
+                    )
+                    .build(),
+            )
         }
 
         /**
@@ -131,7 +185,7 @@ class BackupWorker(
         fun whenThereIsWifi(context: Context) {
             WorkManager.getInstance(context).enqueueUniqueWork(
                 ON_WIFI,
-                androidx.work.ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.REPLACE,
                 OneTimeWorkRequestBuilder<BackupWorker>()
                     .setConstraints(
                         Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build(),
@@ -152,7 +206,7 @@ class BackupWorker(
         fun now(context: Context) {
             WorkManager.getInstance(context).enqueueUniqueWork(
                 ONCE,
-                androidx.work.ExistingWorkPolicy.APPEND_OR_REPLACE,
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
                 OneTimeWorkRequestBuilder<BackupWorker>().build(),
             )
         }

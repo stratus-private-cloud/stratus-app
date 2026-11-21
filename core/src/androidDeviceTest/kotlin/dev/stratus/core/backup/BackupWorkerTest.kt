@@ -10,6 +10,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -42,6 +43,16 @@ class BackupWorkerTest {
             // it is, and Play reviews the answer.
             assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC, info.foregroundServiceType)
         }
+    }
+
+    @Test
+    fun aRefusedForegroundIsAPassWithoutOne() = runTest {
+        // What Android 12 does to a foreground service started from the
+        // background, which is every pass nobody tapped for.
+        val refused = TestListenableWorkerBuilder<BackupWorker>(context)
+            .setForegroundUpdater { _, _, _ -> throw IllegalStateException("not from the background") }
+            .build()
+        assertFalse(refused.intoTheForeground())
     }
 
     @Test

@@ -28,6 +28,7 @@ import dev.stratus.core.session.Ask
 import dev.stratus.core.cast.CastController
 import dev.stratus.core.files.BrowserController
 import dev.stratus.core.files.SearchController
+import dev.stratus.core.files.bannerPeople
 import dev.stratus.core.dav.DavResource
 import dev.stratus.core.media.Thumbnail
 import androidx.compose.material3.NavigationBar
@@ -41,6 +42,7 @@ import dev.stratus.ui.backup.BackupStrip
 import dev.stratus.ui.backup.oneLine
 import dev.stratus.ui.files.BrowserScreen
 import dev.stratus.ui.files.MiniPlayer
+import dev.stratus.ui.files.PeopleStrip
 import dev.stratus.core.play.MusicController
 import dev.stratus.core.play.VideoController
 import androidx.compose.foundation.layout.Column
@@ -61,6 +63,7 @@ private sealed interface Screen {
     data object Server : Screen
     data object Sources : Screen
     data object Trash : Screen
+    data object People : Screen
 }
 
 /**
@@ -76,6 +79,9 @@ private enum class Part(val glyph: String, val label: String, val floor: String,
 }
 
 private const val TRASH = "/trash/"
+
+/** The people the faces in the photographs are grouped into, a folder each (stratus-backend#519). */
+private const val PEOPLE = "/people/"
 
 /** How deep [path] is under [floor], or -1 when it is not under it. */
 private fun depth(path: String, floor: String): Int {
@@ -189,12 +195,19 @@ private fun SignedIn(
     var parts by remember { mutableStateOf<Map<Part, BrowserController>>(emptyMap()) }
     var part by remember { mutableStateOf(Part.Files) }
     var trash by remember { mutableStateOf<BrowserController?>(null) }
+    var people by remember { mutableStateOf<BrowserController?>(null) }
+    // The last listing of people/ itself, so the gallery's strip stays put
+    // while the people screen is inside one of them.
+    var faces by remember { mutableStateOf(emptyList<DavResource>()) }
+    var peopleListed by remember { mutableStateOf(false) }
     // A part is listed the first time it is opened rather than at sign-in:
     // three listings for one screen would be two nobody asked for.
     val listed = remember { mutableSetOf<Part>() }
     fun show(next: Part) {
         part = next
         browser = parts[next]?.also { if (listed.add(next)) it.start() }
+        // Listed with the gallery, which is where the strip is drawn.
+        if (next == Part.Photos && !peopleListed) people?.let { peopleListed = true; it.start() }
     }
     var search by remember { mutableStateOf<SearchController?>(null) }
     var cast by remember { mutableStateOf<CastController?>(null) }
@@ -239,6 +252,9 @@ private fun SignedIn(
             container.browser(scope)?.let { mapOf(Part.Files to it) }.orEmpty()
         }
         trash = if (parts.size > 1) container.browser(scope, TRASH) else null
+        people = if (parts.size > 1) container.browser(scope, PEOPLE) else null
+        faces = emptyList()
+        peopleListed = false
         show(takeOpened() ?: Part.Files)
         shortcuts.offer(if (parts.size > 1) parts.keys.map { Shortcuts.Section(it.name.lowercase(), it.label) } else emptyList())
         // Asked once, here, rather than when the screen opens: whether the
@@ -250,6 +266,12 @@ private fun SignedIn(
         music = container.music(scope)
         videos = container.videos()
         calendars = container.calendarSetup()
+    }
+
+    MainEffect(people) {
+        people?.state?.collect { s ->
+            if (s.path.trimEnd('/') == PEOPLE.trimEnd('/') && !s.busy && s.failure == null) faces = bannerPeople(s.entries)
+        }
     }
 
     MainEffect(search) {
@@ -281,6 +303,7 @@ private fun SignedIn(
         back.onBack = when (screen) {
             is Screen.Browser -> browser?.let { { it.goUp() } } ?: { false }
             is Screen.Trash -> { { trash?.goUp() == true || leave() } }
+            is Screen.People -> { { people?.goUp() == true || leave() } }
             // A photograph opened from a result is shown over this screen.
             is Screen.Search -> { { browser?.stopViewing() == true || leave() } }
             else -> { { leave() } }
@@ -349,6 +372,18 @@ private fun SignedIn(
 
         is Screen.Trash -> trash?.let { bin ->
             BrowserScreen(bin, cast = null, onOpenSettings = { leave() }, onClose = { leave() })
+        }
+
+        is Screen.People -> people?.let { all ->
+            BrowserScreen(
+                all, cast,
+                onOpenSettings = { go(Screen.Settings) },
+                onClose = { leave() },
+                cover = { entry -> pictureOf(container, entry) },
+                // Everybody, and each one's photographs, are grids as the web's are.
+                tiles = { path -> depth(path, PEOPLE) in 0..1 },
+                videos = videos,
+            )
         }
 
         is Screen.Search -> {
@@ -420,6 +455,18 @@ private fun SignedIn(
                     // Albums under an artist, the other place the web draws a
                     // grid; Photos and Videos are timelines, which always are.
                     tiles = { path -> depth(path, Part.Music.floor) == 1 },
+                    header = if (part == Part.Photos && faces.isNotEmpty()) {
+                        {
+                            PeopleStrip(
+                                faces,
+                                picture = { entry -> pictureOf(container, entry) },
+                                onPerson = { person -> people?.let { it.enter(person); go(Screen.People) } },
+                                onAll = { people?.let { it.enter(DavResource(PEOPLE, isDirectory = true)); go(Screen.People) } },
+                            )
+                        }
+                    } else {
+                        null
+                    },
                 )
             }
         }
@@ -446,6 +493,9 @@ private fun Parts(current: Part, onSelect: (Part) -> Unit) {
 private suspend fun pictureOf(container: AppContainer, entry: DavResource): ImageBitmap? {
     val answer = when {
         entry.isDirectory && depth(entry.path, Part.Music.floor) == 2 -> container.thumbnails.cover(entry.path, TILE_PIXELS)
+        // A person's face hangs off their folder the way an album's cover does (stratus-backend#541).
+        entry.isDirectory && depth(entry.path, PEOPLE) == 1 -> container.thumbnails.cover(entry.path, TILE_PIXELS)
+        !entry.isDirectory && depth(entry.path, PEOPLE) == 2 -> container.thumbnails.of(entry, TILE_PIXELS)
         !entry.isDirectory && depth(entry.path, Part.Photos.floor) == 3 -> container.thumbnails.of(entry, TILE_PIXELS)
         !entry.isDirectory && depth(entry.path, Part.Videos.floor) == 3 -> container.thumbnails.of(entry, TILE_PIXELS)
         else -> return null

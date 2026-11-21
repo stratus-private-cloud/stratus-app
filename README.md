@@ -252,7 +252,11 @@ covers, and **Photos and Videos are each one scroll of thumbnails, newest first
 under a heading per month**, as the web's gallery is, rather than folders of
 years and months to walk; older months load as you reach them, one listing
 each. Within a month they are in order of name, newest first, which is the
-order of the date a backup starts its names with. It knows it is a
+order of the date a backup starts its names with. **Where the server has
+grouped the faces in them into people, Photos begins with a few of their faces
+and the word People**: a face opens that person's photographs and the rest of
+the row opens everybody, each drawn by the face the server picked, `?cover` on
+their folder. Naming and merging people is the web's. It knows it is a
 Stratus by the `Stratus-Version` header of one `OPTIONS`, or `Server: Stratus/…`
 where no proxy has rewritten it.
 

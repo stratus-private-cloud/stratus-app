@@ -116,6 +116,8 @@ fun BrowserScreen(
     videos: VideoController? = null,
     /** Whether tapping a track or a film plays it, which is what Music and Videos are for. */
     playOnTap: Boolean = false,
+    /** The first thing in a timeline's scroll, which scrolls away with it: the people, from App. */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
     // Which of two indicators a listing shows: the pulled one for a pull, the
@@ -217,7 +219,7 @@ fun BrowserScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     if (controller.timeline && cover != null) {
-                        Timeline(state.months, state.more, controller, cover, videos, state.selected)
+                        Timeline(state.months, state.more, controller, cover, videos, state.selected, header)
                     } else if (cover != null && tiles(state.path)) {
                         LazyVerticalGrid(
                             GridCells.Adaptive(150.dp),
@@ -309,6 +311,7 @@ private fun Timeline(
     cover: suspend (DavResource) -> ImageBitmap?,
     videos: VideoController?,
     selected: Set<String>,
+    header: (@Composable () -> Unit)?,
 ) {
     val grid = rememberLazyGridState()
     LaunchedEffect(grid, controller) {
@@ -325,6 +328,7 @@ private fun Timeline(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        if (header != null) item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
         months.forEach { month ->
             item(key = month.path, span = { GridItemSpan(maxLineSpan) }) {
                 Text(

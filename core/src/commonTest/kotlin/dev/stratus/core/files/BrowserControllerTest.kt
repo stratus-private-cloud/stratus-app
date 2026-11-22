@@ -229,6 +229,35 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun aDeleteInTheTimelineListsOnlyItsMonthAgain() = runTest {
+        // stratus-app#237: it was the floor, the years and every month loaded.
+        val gone = mutableSetOf<String>()
+        val browser = controller(this, floor = "/photos/", timeline = true) { request ->
+            val path = request.url.encodedPath
+            when {
+                request.method.value == "DELETE" -> { gone += path; HttpStatusCode.NoContent to "" }
+                path == "/photos/2025/03/" && "/photos/2025/03/c.jpg" in gone -> HttpStatusCode.MultiStatus to listing()
+                else -> HttpStatusCode.MultiStatus to photos.getValue(path)
+            }
+        }
+        browser.start()
+        browser.settled()
+        browser.loadMore()
+        val before = browser.settled()
+        assertEquals(listOf("/photos/2026/11", "/photos/2025/03"), before.months.map { it.path })
+
+        seen.clear()
+        browser.ask(Confirmation.Delete(before.entries.single { it.name == "c.jpg" }))
+        browser.confirmDelete()
+        val after = browser.settled()
+
+        assertEquals(listOf("DELETE /photos/2025/03/c.jpg", "PROPFIND /photos/2025/03/"), seen.map { "${it.method.value} ${it.url.encodedPath}" })
+        // Its month was left empty, so it is gone; the other is untouched.
+        assertEquals(listOf("/photos/2026/11"), after.months.map { it.path })
+        assertEquals(listOf("2026-11-09_b.jpg", "2026-11-01_a.jpg"), after.entries.map { it.name })
+    }
+
+    @Test
     fun aRefreshedTimelineKeepsAsManyMonthsAsWereLoaded() = runTest {
         val browser = timeline(this)
         browser.start()

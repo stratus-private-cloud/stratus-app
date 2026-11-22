@@ -3,6 +3,7 @@ package dev.stratus.ui
 import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationShortcutIcon
 import platform.UIKit.UIApplicationShortcutItem
+import platform.UIKit.shortcutItems
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
 

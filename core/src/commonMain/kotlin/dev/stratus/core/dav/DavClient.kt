@@ -1,5 +1,8 @@
 package dev.stratus.core.dav
 
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
+import io.ktor.http.Headers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import io.ktor.client.HttpClient
@@ -111,12 +114,28 @@ class DavClient(
      * because this one has no pass to belong to.
      */
     suspend fun canSearch(): Boolean {
-        val response = http.request(url("/", collection = true)) { method = HttpMethod.Options }
-        if (!response.status.isSuccess()) return false
+        val (ok, headers) = optionsAtRoot()
+        if (!ok) return false
         // A server may list several grammars in the header, or send the header
         // several times; ours is the only one this client can write.
-        return response.headers.getAll(DASL).orEmpty().any { it.contains(GRAMMAR) }
+        return headers.getAll(DASL).orEmpty().any { it.contains(GRAMMAR) }
     }
+
+    /**
+     * The answer to `OPTIONS` at the root, asked once for this client and kept
+     * (stratus-app#240): whether it is a Stratus and whether it can search are
+     * two readings of one answer, and startup was asking for it three times.
+     * A client lives as long as the address and the credentials it was built
+     * for, which is as long as the answer does; one that failed is not kept.
+     */
+    private suspend fun optionsAtRoot(): Pair<Boolean, Headers> = rootLock.withLock {
+        rootOptions ?: http.request(url("/", collection = true)) { method = HttpMethod.Options }
+            .let { it.status.isSuccess() to it.headers }
+            .also { if (it.first) rootOptions = it }
+    }
+
+    private val rootLock = Mutex()
+    private var rootOptions: Pair<Boolean, Headers>? = null
 
     /**
      * The version of the Stratus answering, from one `OPTIONS` at the root, or
@@ -124,7 +143,7 @@ class DavClient(
      * proxy -- Fly's, or nginx by default -- rewrites or drops `Server`.
      */
     suspend fun stratusVersion(): String? {
-        val headers = http.request(url("/", collection = true)) { method = HttpMethod.Options }.headers
+        val (_, headers) = optionsAtRoot()
         return headers[STRATUS_VERSION]
             ?: headers[HttpHeaders.Server]?.takeIf { it.startsWith("Stratus/") }?.removePrefix("Stratus/")
     }

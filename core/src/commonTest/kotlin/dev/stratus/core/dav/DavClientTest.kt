@@ -217,4 +217,27 @@ class DavClientTest {
     }
 
     private fun requestDeadline() = lastRequest?.getCapabilityOrNull(HttpTimeoutCapability)?.requestTimeoutMillis
+
+    @Test
+    fun theRootIsAskedWhatItIsOnce() = runTest {
+        // stratus-app#240: whether it is a Stratus and whether it searches are
+        // one answer, and startup asked for it three times.
+        var asked = 0
+        val engine = MockEngine {
+            asked++
+            if (asked == 1) {
+                respond("", HttpStatusCode.ServiceUnavailable)
+            } else {
+                respond("", HttpStatusCode.OK, headersOf("Stratus-Version" to listOf("1.2.3"), "DASL" to listOf("<DAV:basicsearch>")))
+            }
+        }
+        val client = DavClient(HttpClient(engine), "http://host/")
+
+        // A refusal is not kept: the next question asks again.
+        assertEquals(false, client.canSearch())
+        assertEquals("1.2.3", client.stratusVersion())
+        assertEquals(true, client.canSearch())
+        assertEquals("1.2.3", client.stratusVersion())
+        assertEquals(2, asked)
+    }
 }

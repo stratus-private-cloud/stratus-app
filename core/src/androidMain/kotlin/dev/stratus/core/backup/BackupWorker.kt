@@ -64,7 +64,10 @@ class BackupWorker(
             keepGoing = { !isStopped },
             onStep = { step ->
                 if (foreground && step is QueueStep.Uploaded) {
-                    setForegroundAsync(notify(step.path.substringAfterLast('/')))
+                    // A document somebody picked is not their backup, and the
+                    // notification says which (stratus-app#258).
+                    val title = if (step.byHand) "Uploading" else "Backing up"
+                    setForegroundAsync(notify(step.path.substringAfterLast('/'), title))
                 }
             },
         )
@@ -110,7 +113,7 @@ class BackupWorker(
      */
     override suspend fun getForegroundInfo(): ForegroundInfo = notify("Looking for new photographs")
 
-    private fun notify(detail: String): ForegroundInfo {
+    private fun notify(detail: String, title: String = "Backing up"): ForegroundInfo {
         val manager = applicationContext.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
             manager.createNotificationChannel(
@@ -118,7 +121,7 @@ class BackupWorker(
             )
         }
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL)
-            .setContentTitle("Backing up")
+            .setContentTitle(title)
             .setContentText(detail)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setOngoing(true)

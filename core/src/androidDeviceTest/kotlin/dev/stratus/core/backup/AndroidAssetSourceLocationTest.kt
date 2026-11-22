@@ -59,7 +59,11 @@ class AndroidAssetSourceLocationTest {
             Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).compress(Bitmap.CompressFormat.JPEG, 90, it)
         }
         ExifInterface(made.path).apply {
-            setLatLong(LISBON_LAT, LISBON_LON)
+            // The platform's ExifInterface has no setLatLong; that is androidx's.
+            setAttribute(ExifInterface.TAG_GPS_LATITUDE, "38/1,43/1,2028/100")
+            setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, "N")
+            setAttribute(ExifInterface.TAG_GPS_LONGITUDE, "9/1,8/1,2148/100")
+            setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, "W")
             saveAttributes()
         }
 
@@ -81,7 +85,7 @@ class AndroidAssetSourceLocationTest {
     fun theBytesSentStillSayWhereItWasTaken() = runTest {
         val asset = located()
         val sent = source.open(asset.localId, AssetPart.Still).buffered().readByteArray()
-        val place = ExifInterface(ByteArrayInputStream(sent)).latLong
+        val place = placeOf(sent)
         assertTrue(place != null && near(place), "sent without its place: ${place?.toList()}")
     }
 
@@ -93,7 +97,7 @@ class AndroidAssetSourceLocationTest {
         val files = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
         val uri = ContentUris.withAppendedId(files, asset.localId.toLong())
         val plain = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-        val place = ExifInterface(ByteArrayInputStream(plain)).latLong
+        val place = placeOf(plain)
         assertFalse(place != null && near(place), "Android did not redact it, so the other test proves nothing")
     }
 
@@ -107,7 +111,12 @@ class AndroidAssetSourceLocationTest {
         return source.assets(setOf(bucket)).single()
     }
 
-    private fun near(place: DoubleArray) =
+    private fun placeOf(bytes: ByteArray): FloatArray? {
+        val place = FloatArray(2)
+        return place.takeIf { ExifInterface(ByteArrayInputStream(bytes)).getLatLong(it) }
+    }
+
+    private fun near(place: FloatArray) =
         abs(place[0] - LISBON_LAT) < 0.001 && abs(place[1] - LISBON_LON) < 0.001
 
     private fun shell(command: String) {

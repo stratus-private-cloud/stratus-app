@@ -1333,8 +1333,11 @@ Stratus at its origin has parts: they are published once the server has said
 so and withdrawn when the signed-in screen goes. `Shortcuts` is the seam --
 the platform hands in the part it was opened at, and the app tells it which
 parts there are. A part asked for before the server has answered is held
-until it has, which is the cold start from a shortcut. iOS quick actions are
-not built (stratus-app#199).
+until it has, which is the cold start from a shortcut. **iOS has them as home
+screen quick actions** (stratus-app#199): the same `Shortcuts` published as
+`UIApplicationShortcutItem`s with SF Symbols, and a scene delegate of our own
+in Swift handing the part picked to `openShortcut`, at launch and while
+running. Unverified on a device, which is #117's.
 
 ## Crash reports
 

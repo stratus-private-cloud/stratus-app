@@ -33,6 +33,7 @@ fun MainViewController() = ComposeUIViewController {
                 scope.launch { (container.assets as? IosAssetSource)?.request() }
             }
         },
+        shortcuts = iosShortcuts,
         // Picked, copied into the container and queued, and then the same
         // pass a tap starts, which hands it to the background session
         // (stratus-app#127).

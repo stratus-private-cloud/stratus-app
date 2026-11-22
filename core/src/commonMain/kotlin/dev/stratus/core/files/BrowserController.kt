@@ -14,6 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.exhausted
@@ -48,6 +49,8 @@ class BrowserController(
      * `Depth: infinity`.
      */
     val timeline: Boolean = false,
+    /** What has been picked to upload into the folder on screen (stratus-app#127); null where nothing can be. */
+    private val uploads: HandUploads? = null,
 ) {
     /** The originals the viewer has downloaded, so swiping back is not another download (stratus-app#238). */
     private val originals = KeptOriginals()
@@ -59,6 +62,8 @@ class BrowserController(
     val state: StateFlow<BrowserState> = mutable.asStateFlow()
 
     private var running: Job? = null
+    private var watching: Job? = null
+    private var watched: String? = null
 
     /**
      * Lists where the browser is, except that a Stratus rooted at its origin
@@ -79,6 +84,7 @@ class BrowserController(
                 path = STRATUS_HOME
             }
             mutable.value = mutable.value.copy(path = path)
+            watch(path)
             if (timeline) openTimeline(1) else load(path)
         }
     }
@@ -110,6 +116,33 @@ class BrowserController(
             path = path, busy = true, failure = null, pending = null, viewing = null, selected = emptySet(),
         )
         running = scope.launch { reload() }
+        watch(path)
+    }
+
+    /**
+     * Follows what is being uploaded into [path], and lists the folder again
+     * whenever an upload arrives (stratus-app#127). Told rather than inferred
+     * from a row leaving the queue: a small file is picked, sent and gone
+     * between two looks at the queue, and the folder never learned it was there.
+     */
+    private fun watch(path: String) {
+        val uploads = uploads ?: return
+        if (timeline || (path == watched && watching?.isActive == true)) return
+        watching?.cancel()
+        watched = path
+        mutable.value = mutable.value.copy(uploads = emptyList())
+        watching = scope.launch {
+            launch { uploads.into(path).collect { now -> mutable.value = mutable.value.copy(uploads = now) } }
+            uploads.arrivals.drop(1).collect {
+                if (running?.isActive != true) running = scope.launch { load(path) }
+            }
+        }
+    }
+
+    /** Takes an upload off the queue, which is how one that failed is got rid of. */
+    fun cancelUpload(upload: HandUpload) {
+        val uploads = uploads ?: return
+        scope.launch { uploads.cancel(upload.path) }
     }
 
     /** What is on screen asked for again: the folder, or as many months as were loaded. */

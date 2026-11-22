@@ -17,6 +17,8 @@ data class BrowserState(
     val months: List<TimelineMonth> = emptyList(),
     /** Whether a timeline has older months it has not loaded yet. */
     val more: Boolean = false,
+    /** Files picked by hand on their way into this folder, drawn above what is in it (stratus-app#127). */
+    val uploads: List<HandUpload> = emptyList(),
 )
 
 /** One month of a timeline: the collection it was listed from, and its files. */

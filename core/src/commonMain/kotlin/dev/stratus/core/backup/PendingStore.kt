@@ -51,6 +51,17 @@ data class PendingUpload(
      * photograph twice.
      */
     val ticket: String? = null,
+    /** Where the bytes are (stratus-app#127). */
+    val origin: Origin = Origin.Library,
+    /**
+     * For a file picked by hand whose name is not settled yet, which numbered
+     * copy of the name [path] is trying: 1 for the name itself, 2 for ` (2)`.
+     * Null once the name is the row's for good, and always for the camera
+     * roll, whose paths are derived and must not move.
+     */
+    val numbered: Int? = null,
+    /** When it may be tried again; `Long.MAX_VALUE` is never. */
+    val nextAt: Long = 0,
 )
 
 /**
@@ -99,8 +110,8 @@ class PendingStore(
         connection.prepare(
             """
             INSERT OR IGNORE INTO pending
-                (path, local_id, part, size, content_type, taken_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (path, local_id, part, size, content_type, taken_at, origin, numbered)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
         ).use { statement ->
             statement.bindText(1, upload.path)
@@ -109,6 +120,8 @@ class PendingStore(
             statement.bindLong(4, upload.size)
             if (upload.contentType == null) statement.bindNull(5) else statement.bindText(5, upload.contentType)
             statement.bindText(6, upload.takenAt)
+            statement.bindText(7, upload.origin.name)
+            if (upload.numbered == null) statement.bindNull(8) else statement.bindLong(8, upload.numbered.toLong())
             statement.step()
         }
     }
@@ -120,15 +133,16 @@ class PendingStore(
      * for; a first backup that starts in 2014 looks broken for days. Anything
      * waiting out a backoff is skipped rather than blocking what is behind it.
      */
-    suspend fun next(now: Long): PendingUpload? = withContext(io) {
+    suspend fun next(now: Long, origin: Origin? = null): PendingUpload? = withContext(io) {
         connection.prepare(
             """
-            SELECT path, local_id, part, size, content_type, taken_at, offset_at, handle, attempts, last_error, ticket
-            FROM pending WHERE next_at <= ? AND ticket IS NULL
+            SELECT $COLUMNS
+            FROM pending WHERE next_at <= ? AND ticket IS NULL AND (? IS NULL OR origin = ?)
             ORDER BY taken_at DESC, path ASC LIMIT 1
             """.trimIndent(),
         ).use { statement ->
             statement.bindLong(1, now)
+            bindOrigin(statement, 2, origin)
             if (!statement.step()) return@withContext null
             read(statement)
         }
@@ -181,7 +195,7 @@ class PendingStore(
     suspend fun byTicket(ticket: String): PendingUpload? = withContext(io) {
         connection.prepare(
             """
-            SELECT path, local_id, part, size, content_type, taken_at, offset_at, handle, attempts, last_error, ticket
+            SELECT $COLUMNS
             FROM pending WHERE ticket = ? LIMIT 1
             """.trimIndent(),
         ).use { statement ->
@@ -225,7 +239,7 @@ class PendingStore(
         val found = mutableListOf<PendingUpload>()
         connection.prepare(
             """
-            SELECT path, local_id, part, size, content_type, taken_at, offset_at, handle, attempts, last_error, ticket
+            SELECT $COLUMNS
             FROM pending ORDER BY taken_at DESC, path ASC
             """.trimIndent(),
         ).use { statement ->
@@ -241,7 +255,7 @@ class PendingStore(
      * asks this every second while somebody is looking at it and there may be
      * forty thousand rows behind the answer.
      */
-    suspend fun summary(now: Long): PendingSummary = withContext(io) {
+    suspend fun summary(now: Long, origin: Origin? = null): PendingSummary = withContext(io) {
         connection.prepare(
             """
             SELECT COUNT(*),
@@ -251,12 +265,13 @@ class PendingStore(
                    MIN(CASE WHEN next_at < ? THEN next_at ELSE NULL END),
                    MAX(CASE WHEN next_at >= ? THEN last_error ELSE NULL END),
                    COALESCE(SUM(CASE WHEN ticket IS NOT NULL THEN size - offset_at ELSE 0 END), 0)
-            FROM pending
+            FROM pending WHERE (? IS NULL OR origin = ?)
             """.trimIndent(),
         ).use { statement ->
             statement.bindLong(1, NEVER)
             statement.bindLong(2, NEVER)
             statement.bindLong(3, NEVER)
+            bindOrigin(statement, 4, origin)
             if (!statement.step()) return@withContext PendingSummary(0, 0, 0, 0, null)
             PendingSummary(
                 total = statement.getInt(0),
@@ -277,17 +292,18 @@ class PendingStore(
      * display twenty of them is how a status display becomes the slow part of
      * an app whose whole job is elsewhere.
      */
-    suspend fun failures(limit: Int): List<PendingUpload> = withContext(io) {
+    suspend fun failures(limit: Int, origin: Origin? = null): List<PendingUpload> = withContext(io) {
         val found = mutableListOf<PendingUpload>()
         connection.prepare(
             """
-            SELECT path, local_id, part, size, content_type, taken_at, offset_at, handle, attempts, last_error, ticket
-            FROM pending WHERE next_at >= ?
+            SELECT $COLUMNS
+            FROM pending WHERE next_at >= ? AND (? IS NULL OR origin = ?)
             ORDER BY taken_at DESC LIMIT ?
             """.trimIndent(),
         ).use { statement ->
             statement.bindLong(1, NEVER)
-            statement.bindLong(2, limit.toLong())
+            bindOrigin(statement, 2, origin)
+            statement.bindLong(4, limit.toLong())
             while (statement.step()) found += read(statement)
         }
         found
@@ -311,10 +327,61 @@ class PendingStore(
         attempts = statement.getInt(8),
         lastError = if (statement.isNull(9)) null else statement.getText(9),
         ticket = if (statement.isNull(10)) null else statement.getText(10),
+        origin = Origin.valueOf(statement.getText(11)),
+        numbered = if (statement.isNull(12)) null else statement.getInt(12),
+        nextAt = statement.getLong(13),
     )
+
+    /** Every row of one [origin], newest first. */
+    suspend fun all(origin: Origin): List<PendingUpload> = withContext(io) {
+        val found = mutableListOf<PendingUpload>()
+        connection.prepare(
+            "SELECT $COLUMNS FROM pending WHERE origin = ? ORDER BY taken_at DESC, path ASC",
+        ).use { statement ->
+            statement.bindText(1, origin.name)
+            while (statement.step()) found += read(statement)
+        }
+        found
+    }
+
+    suspend fun contains(path: String): Boolean = withContext(io) {
+        connection.prepare("SELECT 1 FROM pending WHERE path = ?").use { statement ->
+            statement.bindText(1, path)
+            statement.step()
+        }
+    }
+
+    /**
+     * Moves a row to another path, and says which copy of its name that is --
+     * null once the name is settled (stratus-app#127). Only ever a hand
+     * upload: a camera roll's path is derived from the photograph.
+     */
+    suspend fun rename(from: String, to: String, numbered: Int?) = withContext(io) {
+        connection.prepare("UPDATE pending SET path = ?, numbered = ? WHERE path = ?").use { statement ->
+            statement.bindText(1, to)
+            if (numbered == null) statement.bindNull(2) else statement.bindLong(2, numbered.toLong())
+            statement.bindText(3, from)
+            statement.step()
+        }
+        Unit
+    }
+
+    /** Both placeholders of an `(? IS NULL OR origin = ?)`, starting at [at]. */
+    private fun bindOrigin(statement: SQLiteStatement, at: Int, origin: Origin?) {
+        if (origin == null) {
+            statement.bindNull(at)
+            statement.bindNull(at + 1)
+        } else {
+            statement.bindText(at, origin.name)
+            statement.bindText(at + 1, origin.name)
+        }
+    }
 
     private companion object {
         /** The marker the queue writes for work it will not try again. */
         const val NEVER = Long.MAX_VALUE
+
+        const val COLUMNS =
+            "path, local_id, part, size, content_type, taken_at, offset_at, handle, attempts, last_error, ticket, origin, numbered, next_at"
     }
 }

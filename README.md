@@ -9,8 +9,9 @@ same rule: it talks **standard WebDAV**, so it works against any WebDAV server �
 Stratus, Nextcloud, a box running rclone serve — and it never calls anything
 private to Stratus.
 
-> **Early.** You can sign in to a server, walk its files, choose which folders
-> are backed up and watch what the backup is doing. On Android it runs in the
+> **Early.** You can sign in to a server, walk its files, upload files into
+> it by hand, choose which folders are backed up and watch what the backup is
+> doing. On Android it runs in the
 > background. **On iOS it now backs up too**: the camera roll goes out through a
 > background transfer that the system finishes while the app is closed, and
 > which has never been run by anybody on a real phone — see
@@ -49,6 +50,29 @@ Baseline first, upgrade when offered: one `OPTIONS` at the start of each backup
 pass decides which of the two runs, and a server that answers it with anything
 else gets `PUT`. That keeps "works with any WebDAV server" true without giving up
 resumable uploads where the server can do them.
+
+## Uploading by hand
+
+**Upload**, in the bar of the folder you are looking at, opens the system's
+picker; what you pick lands in that folder under its own name, with backup on
+or off. It goes through the same queue as the camera roll — the same
+negotiation, so a large file resumes where the server offers tus, and the same
+retries — and goes before it. On Android it carries on with the app closed; on
+iOS the picked file is copied into the app first and leaves through the same
+background transfer a backup does.
+
+**A name that is taken is not replaced**: the file lands beside it as
+`scan (2).pdf`, then `(3)`, which is how Stratus's own import folder numbers.
+Over `PUT` the server is asked not to replace (`If-None-Match: *`); over tus,
+which has no such header, the folder is asked first. Once an upload has a name
+it keeps it, so a resumed one never moves.
+
+It is shown where it is going and not on the backup screen: a row in the
+folder, `Uploading… 40 %`, that becomes the file when it is there. The backup's
+own count is the camera roll's alone. A file the server refuses for good stays
+as a row saying why, until you take it away with its ×. On a Stratus it is
+offered in Files and not in Photos, Music or Videos, which the server makes
+itself and nothing can be put into.
 
 ## Platform reality
 

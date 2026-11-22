@@ -23,7 +23,9 @@ class PutTransport(private val dav: DavClient) : Transport {
         begun: suspend (Resume) -> Unit,
     ): UploadOutcome =
         try {
-            UploadOutcome.Done(dav.put(target.path, target.size, body.open(0), target.contentType))
+            UploadOutcome.Done(dav.put(target.path, target.size, body.open(0), target.contentType, target.exclusive))
+        } catch (e: DavError.PreconditionFailed) {
+            if (target.exclusive) UploadOutcome.Taken else UploadOutcome.Failed(kindOf(e), e.message ?: "no detail")
         } catch (e: DavError) {
             UploadOutcome.Failed(kindOf(e), e.message ?: "no detail")
         }

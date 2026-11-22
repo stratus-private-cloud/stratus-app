@@ -12,6 +12,13 @@ data class UploadTarget(
     val path: String,
     val size: Long,
     val contentType: String?,
+    /**
+     * Must not replace what is there: a file picked by hand whose name is not
+     * settled yet (stratus-app#127). A `PUT` says so with `If-None-Match: *`
+     * and answers [UploadOutcome.Taken]; tus has no such header, so the queue
+     * has found a free name before it gets this far.
+     */
+    val exclusive: Boolean = false,
 )
 
 /** Where a previous attempt got to, when the transport can be told to continue. */
@@ -44,6 +51,9 @@ sealed interface UploadOutcome {
      * do anything else.
      */
     data class HandedOver(val ticket: String, val resume: Resume? = null) : UploadOutcome
+
+    /** An [exclusive][UploadTarget.exclusive] write found the name taken, and wrote nothing. */
+    data object Taken : UploadOutcome
 }
 
 /**
@@ -75,6 +85,9 @@ fun outcomeOf(upload: PendingUpload, answer: TransferAnswer): UploadOutcome = wh
     // progress to be carried on from, and for a `PUT` it is a restart, which
     // is what a `PUT` has always meant.
     answer.status == null -> UploadOutcome.Interrupted(Resume(upload.handle, answer.offset ?: upload.offset))
+
+    // Only a write that asked not to replace can be refused for it.
+    answer.status == 412 && upload.numbered != null -> UploadOutcome.Taken
 
     answer.status !in 200..299 ->
         UploadOutcome.Failed(TusProtocol.kindOf(answer.status), answer.detail ?: "the server answered ${answer.status}")

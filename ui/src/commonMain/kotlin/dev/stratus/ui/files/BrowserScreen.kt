@@ -77,6 +77,8 @@ import dev.stratus.core.dav.DavResource
 import dev.stratus.core.files.BrowserController
 import dev.stratus.core.files.BrowserFailure
 import dev.stratus.core.files.Confirmation
+import dev.stratus.core.files.HandUpload
+import dev.stratus.core.files.HandUploadState
 import dev.stratus.core.files.TimelineMonth
 import dev.stratus.core.files.isPicture
 import dev.stratus.core.play.MusicController
@@ -97,6 +99,8 @@ fun BrowserScreen(
     onSearch: (() -> Unit)? = null,
     /** For a server that stopped accepting the sign-in this app holds. */
     onEditServer: () -> Unit = {},
+    /** Picks files to upload into this folder; null where nothing can be put here. */
+    onUpload: (() -> Unit)? = null,
     /** Drawn under the bar and above everything else: the backup strip, from App. */
     banner: @Composable () -> Unit = {},
     /** The sections of a Stratus, from App; nothing against any other server. */
@@ -175,6 +179,12 @@ fun BrowserScreen(
                                 modifier = Modifier.semantics { contentDescription = "Delete the selected" },
                             ) { Symbol(Glyph.DELETE, Modifier.clearAndSetSemantics {}) }
                         } else {
+                            if (onUpload != null) {
+                                IconButton(
+                                    onClick = onUpload,
+                                    modifier = Modifier.semantics { contentDescription = "Upload" },
+                                ) { Symbol(Glyph.UPLOAD, Modifier.clearAndSetSemantics {}) }
+                            }
                             if (onSearch != null) {
                                 IconButton(onClick = onSearch) { Symbol(Glyph.SEARCH) }
                             }
@@ -239,6 +249,12 @@ fun BrowserScreen(
                         }
                     } else {
                         LazyColumn(Modifier.fillMaxSize()) {
+                            // Above the listing, and gone into it once sent:
+                            // the folder refreshes and the file takes its place.
+                            items(state.uploads, key = { "upload:" + it.path }) { upload ->
+                                Uploading(upload, onCancel = { controller.cancelUpload(upload) })
+                                HorizontalDivider()
+                            }
                             items(state.entries, key = { it.path }) { entry ->
                                 Entry(
                                     entry, controller, cast,
@@ -505,6 +521,38 @@ internal fun Entry(
             onLongClick = { if (onSelect != null) onSelect(entry) else menuOpen = true },
         ),
     )
+}
+
+/** A file picked by hand on its way into this folder (stratus-app#127). */
+@Composable
+private fun Uploading(upload: HandUpload, onCancel: () -> Unit) {
+    val fraction = if (upload.size > 0) (upload.sent.toFloat() / upload.size).coerceIn(0f, 1f) else 0f
+    ListItem(
+        leadingContent = { Symbol(Glyph.UPLOAD) },
+        headlineContent = { Text(upload.name) },
+        supportingContent = {
+            Column {
+                Text(uploadingLine(upload))
+                if (upload.state == HandUploadState.Sending) {
+                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                }
+            }
+        },
+        trailingContent = {
+            IconButton(
+                onClick = onCancel,
+                modifier = Modifier.semantics { contentDescription = "Cancel the upload of ${upload.name}" },
+            ) { Symbol(Glyph.CLOSE, Modifier.clearAndSetSemantics {}) }
+        },
+    )
+}
+
+internal fun uploadingLine(upload: HandUpload): String = when (val state = upload.state) {
+    HandUploadState.Waiting -> "Waiting to upload"
+    HandUploadState.Sending ->
+        if (upload.size > 0) "Uploading… ${upload.sent * 100 / upload.size} %" else "Uploading…"
+    is HandUploadState.Retrying -> "Will try again" + (state.detail?.let { ": $it" } ?: "")
+    is HandUploadState.Failed -> "Could not upload" + (state.detail?.let { ": $it" } ?: "")
 }
 
 @Composable

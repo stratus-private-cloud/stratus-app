@@ -3,8 +3,15 @@ package dev.stratus.core.backup
 import dev.stratus.core.dav.DavClient
 import dev.stratus.core.server.Server
 import dev.stratus.core.server.ServerStore
+import dev.stratus.core.dav.DavError
 import io.ktor.client.HttpClient
+import io.ktor.util.date.getTimeMillis
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -79,7 +86,24 @@ class Backup(
     private val network: Network = Network { false },
     /** How much may be in the system's hands at once, where transfers are handed over (stratus-app#233). */
     private val handOverAtMost: HandOverBudget? = null,
+    /** Where files picked by hand are read from (stratus-app#127), or null where nothing can pick one. */
+    private val picked: PickedFiles? = null,
+    private val now: () -> Long = { getTimeMillis() },
 ) {
+    private val sent = MutableStateFlow<Map<String, Long>>(emptyMap())
+
+    /** How far each hand upload being sent in this process has got, by path. */
+    val progress: StateFlow<Map<String, Long>> = sent.asStateFlow()
+
+    private val landed = MutableStateFlow(0)
+
+    /**
+     * How many hand uploads have arrived in this process's life, for a folder
+     * to list itself again. A count rather than the rows leaving the queue,
+     * which a small file does between two looks at it.
+     */
+    val arrivals: StateFlow<Int> = landed.asStateFlow()
+
     /** What to say about the backup, assembled from what the queue actually holds. */
     val status: BackupStatus by lazy {
         BackupStatus(database, assets, parked = ::parked, passing = { guard.withLock { passing } })
@@ -144,19 +168,65 @@ class Backup(
 
     private suspend fun onePass(keepGoing: () -> Boolean, onStep: (QueueStep) -> Unit): PassOutcome {
         liveTransfers?.let { live -> reconcile(live()) }
-        val instance = enabled() ?: return PassOutcome.Finished
         if (!keepGoing()) return PassOutcome.Finished
-        val report = run().once(instance, keepGoing, onStep)
+        // One queue for both halves of the pass, so the transport is
+        // negotiated once whichever of them needs it first.
+        var prepared: ServerBackup? = null
+        val prepareOnce: suspend () -> ServerBackup? = { prepared ?: prepare().also { prepared = it } }
+
+        val byHand = byHand(prepareOnce, keepGoing, onStep)
+        val instance = enabled() ?: return byHand
+        if (!keepGoing()) return byHand
+        val report = run(prepareOnce).once(instance, keepGoing, onStep)
         // InFlight too, and not because the system needs reminding about what
         // it is carrying -- it does not. A pass that ended with something in
         // flight may also have left rows serving out a backoff, and that
         // reason is the one that got reported.
-        return when (report.stopped) {
+        val backup = when (report.stopped) {
             StoppedBecause.WaitingForWifi -> PassOutcome.WhenThereIsWifi
             StoppedBecause.WaitingToRetry, StoppedBecause.InFlight -> PassOutcome.ComeBackLater
             else -> PassOutcome.Finished
         }
+        return when {
+            byHand == PassOutcome.ComeBackLater || backup == PassOutcome.ComeBackLater -> PassOutcome.ComeBackLater
+            else -> backup
+        }
     }
+
+    /**
+     * Sends what was picked by hand, whether or not there is a backup at all
+     * (stratus-app#127): somebody who never chose a folder to back up can
+     * still put a document on their server, and the pass is the one place
+     * that holds the lock, the transports and the budget.
+     *
+     * Before the camera roll and apart from it, so it needs no access to the
+     * library and never enumerates it. And not parked for wifi: that setting
+     * is the backup's, and a file somebody has just pressed upload on is a
+     * thing they asked to go now.
+     */
+    private suspend fun byHand(
+        prepare: suspend () -> ServerBackup?,
+        keepGoing: () -> Boolean,
+        onStep: (QueueStep) -> Unit,
+    ): PassOutcome {
+        if (handOwed() == 0) return PassOutcome.Finished
+        val queue = prepare()?.queue ?: return PassOutcome.Finished
+        while (keepGoing()) {
+            if (handOverAtMost != null && handOverAtMost.spent(queue.summary())) return PassOutcome.ComeBackLater
+            val step = queue.runNext(Origin.Picked)
+            onStep(step)
+            when (step) {
+                is QueueStep.Idle -> break
+                is QueueStep.Unreachable -> return PassOutcome.ComeBackLater
+                else -> {}
+            }
+        }
+        return if (handOwed() == 0) PassOutcome.Finished else PassOutcome.ComeBackLater
+    }
+
+    /** Hand uploads still to send; one given up on is waiting for somebody, not for a pass. */
+    private suspend fun handOwed(): Int =
+        database.pending().summary(now(), Origin.Picked).let { it.total - it.givenUp }
 
     /**
      * A pass, assembled.
@@ -164,9 +234,9 @@ class Backup(
      * Built here rather than by each platform's scheduler, so that what a pass
      * is made of is decided once: the platforms contribute only when it runs.
      */
-    suspend fun run(): BackupRun = BackupRun(
+    suspend fun run(prepareFor: suspend () -> ServerBackup? = { prepare() }): BackupRun = BackupRun(
         source = assets,
-        prepareFor = { prepare() },
+        prepareFor = prepareFor,
         journalFor = { database.journal() },
         network = network,
         handOverAtMost = handOverAtMost,
@@ -204,6 +274,11 @@ class Backup(
                 source = assets,
                 transport = transports(connection, instance),
                 directories = DavDirectoryMaker(connection.dav),
+                now = now,
+                picked = picked,
+                taken = { path -> isTaken(connection.dav, path) },
+                progress = sent,
+                arrived = { landed.update { it + 1 } },
             ),
             index = BackupIndex(layout, cache, connection.dav),
             mark = database.mark(),
@@ -224,11 +299,43 @@ class Backup(
     /** Puts back everything the platform has forgotten it was carrying. */
     suspend fun reconcile(live: Set<String>): Int = records().reconcile(live)
 
-    private suspend fun records() = UploadRecords(database.pending(), database.cache())
+    private suspend fun records() = UploadRecords(database.pending(), database.cache(), now, picked) { landed.update { it + 1 } }
 
-    /** What has gone wrong, with what the server said about each, bounded. */
+    /** What has gone wrong with the backup, with what the server said about each, bounded. */
     suspend fun failures(limit: Int = 20): List<PendingUpload> =
-        database.pending().failures(limit)
+        database.pending().failures(limit, Origin.Library)
+
+    /** Whether a pass has anything to do: a backup to run, or a file picked by hand to send. */
+    suspend fun owed(): Boolean =
+        enabled() != null || handOwed() > 0
+
+    /**
+     * Queues [files] into [folder], to be sent by the next pass -- which the
+     * caller asks for, since only the platform can start one that outlives
+     * the screen (stratus-app#127).
+     */
+    suspend fun uploadByHand(folder: String, files: List<PickedFile>): List<String> =
+        database.pending().enqueueByHand(folder, files, now())
+
+    /** Every hand upload not yet finished, given up on or not. */
+    suspend fun handUploads(): List<PendingUpload> = database.pending().all(Origin.Picked)
+
+    /**
+     * Takes a hand upload off the queue. One the system is carrying finishes
+     * anyway, and is recorded against a row that is no longer there -- which
+     * is nothing, as an unknown ticket always is.
+     */
+    suspend fun cancelHandUpload(path: String) {
+        val pending = database.pending()
+        val row = pending.all(Origin.Picked).firstOrNull { it.path == path } ?: return
+        pending.remove(path)
+        picked?.forget(row.localId)
+    }
+
+    /** Lets go of every file picked by hand, for signing out, which empties the queue. */
+    suspend fun forgetHandUploads() {
+        for (row in database.pending().all(Origin.Picked)) picked?.forget(row.localId)
+    }
 
     /**
      * Which sources feed the backup, which is also the switch.
@@ -254,4 +361,14 @@ class Backup(
 
     /** Whether the photo library can be read at all, which decides what to say. */
     suspend fun access() = assets.access()
+}
+
+/** Whether [path] holds anything, by one `Depth: 0` `PROPFIND`; anything but a 404 is an answer to report. */
+internal suspend fun isTaken(dav: DavClient, path: String): Boolean = try {
+    dav.stat(path)
+    true
+} catch (e: CancellationException) {
+    throw e
+} catch (_: DavError.NotFound) {
+    false
 }

@@ -11,6 +11,7 @@ import dev.stratus.core.backup.BackupDatabase
 import dev.stratus.core.backup.Connection
 import dev.stratus.core.backup.KeptConnections
 import dev.stratus.core.backup.Network
+import dev.stratus.core.backup.PickedFiles
 import dev.stratus.core.backup.Transport
 import dev.stratus.core.cast.CastController
 import dev.stratus.core.cast.Caster
@@ -24,6 +25,7 @@ import dev.stratus.core.play.VideoController
 import dev.stratus.core.play.VideoScreen
 import dev.stratus.core.files.isStratusAtOrigin
 import dev.stratus.core.files.FileHandoff
+import dev.stratus.core.files.QueuedHandUploads
 import dev.stratus.core.files.SearchController
 import dev.stratus.core.media.Thumbnails
 import dev.stratus.core.server.Server
@@ -84,6 +86,8 @@ class AppContainer(
     private val videoScreen: VideoScreen? = null,
     /** What calendars and contacts are handed to (stratus-app#185), or null where nothing takes them. */
     private val calendars: CalendarHandoff? = null,
+    /** Where files picked to upload by hand are read from (stratus-app#127), or null where nothing picks one. */
+    val picked: PickedFiles? = null,
 ) {
     private val instances = ServerStore(secure, serversChanged)
 
@@ -114,9 +118,9 @@ class AppContainer(
 
     val backup: Backup by lazy {
         if (transports == null) {
-            Backup(instances, database, assets, connections, network = network)
+            Backup(instances, database, assets, connections, network = network, picked = picked)
         } else {
-            Backup(instances, database, assets, connections, transports, liveTransfers, network, handOverAtMost)
+            Backup(instances, database, assets, connections, transports, liveTransfers, network, handOverAtMost, picked)
         }
     }
 
@@ -152,6 +156,7 @@ class AppContainer(
      * camera roll that never gets backed up again.
      */
     suspend fun signOut() {
+        backup.forgetHandUploads()
         instances.clear()
         database.clear()
         connections.clear()
@@ -267,6 +272,7 @@ class AppContainer(
             Sharing(ShareLinks(instance.baseUrl, credentials), sharing, linkSupportFor(instance)),
             floor,
             timeline,
+            uploads = picked?.let { QueuedHandUploads(backup) },
         )
     }
 

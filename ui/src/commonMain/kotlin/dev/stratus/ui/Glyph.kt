@@ -46,6 +46,7 @@ object Glyph {
     const val OPEN = "\uE8F4"
     const val DETAILS = "\uE88E"
     const val DOWNLOAD = "\uF090"
+    const val UPLOAD = "\uF09B"
     const val SHARE = "\uE80D"
     const val SEND = "\uE163"
     const val RENAME = EDIT

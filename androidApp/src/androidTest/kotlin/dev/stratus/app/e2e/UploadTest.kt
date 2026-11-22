@@ -1,0 +1,76 @@
+package dev.stratus.app.e2e
+
+import android.app.Activity
+import android.app.Instrumentation
+import android.content.Intent
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
+import androidx.core.content.FileProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Test
+import java.io.File
+import kotlin.test.assertEquals
+
+class UploadTest : E2E() {
+
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private val context = instrumentation.targetContext
+
+    /** A file the app's own provider serves, which is the shape the picker answers in: a content URI. */
+    private fun pickable(name: String, text: String) =
+        File(context.cacheDir, "handoff").apply { mkdirs() }.resolve(name).let { file ->
+            file.writeText(text)
+            FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        }
+
+    /**
+     * stratus-app#127: from the folder on screen, with backup off, a file
+     * lands beside one of its name rather than over it.
+     *
+     * The picker is the system's, so it is answered from inside the process
+     * by a monitor -- the API 26 one that sees every intent -- with the
+     * content URI it would have given. Everything after that is the app's
+     * own: the grant it tries for, the queue, the pass the worker runs and
+     * the folder refreshing once the file is there.
+     */
+    @Test
+    fun aPickedFileLandsInTheFolderBesideOneOfItsName() {
+        Stratus.folder("/$unique/")
+        Stratus.file("/$unique/scan.txt", "already there".encodeToByteArray())
+        val picked = pickable("scan.txt", "picked by hand")
+        signedIn()
+        tap(unique)
+        see("scan.txt")
+
+        val picker = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? =
+                if (intent.action == Intent.ACTION_OPEN_DOCUMENT) {
+                    Instrumentation.ActivityResult(Activity.RESULT_OK, Intent().setData(picked))
+                } else {
+                    null
+                }
+        }
+        instrumentation.addMonitor(picker)
+        try {
+            ui.onNodeWithContentDescription("Upload").performClick()
+            waitFor(60_000) { Stratus.exists("/$unique/scan (2).txt") }
+        } finally {
+            instrumentation.removeMonitor(picker)
+        }
+
+        assertEquals("picked by hand", Stratus.read("/$unique/scan (2).txt"))
+        assertEquals("already there", Stratus.read("/$unique/scan.txt"))
+        // The row gave way to the file, in the folder somebody is looking at.
+        see("scan (2).txt")
+        gone("Uploading", timeoutMs = 30_000)
+    }
+
+    private fun waitFor(timeoutMs: Long, condition: () -> Boolean) {
+        val until = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < until) {
+            if (runCatching(condition).getOrDefault(false)) return
+            Thread.sleep(500)
+        }
+        throw AssertionError("it never arrived. The screen showed:\n${screen()}")
+    }
+}

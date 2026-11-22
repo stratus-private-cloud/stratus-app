@@ -3,6 +3,7 @@ package dev.stratus.ui
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.window.ComposeUIViewController
 import dev.stratus.core.backup.IosAssetSource
+import dev.stratus.core.backup.IosPickedFiles
 import dev.stratus.core.session.Ask
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,6 +34,17 @@ fun MainViewController() = ComposeUIViewController {
             }
         },
         shortcuts = iosShortcuts,
+        // Picked, copied into the container and queued, and then the same
+        // pass a tap starts, which hands it to the background session
+        // (stratus-app#127).
+        onUpload = { folder ->
+            scope.launch {
+                val files = (container.picked as? IosPickedFiles)?.pick().orEmpty()
+                if (files.isEmpty()) return@launch
+                container.backup.uploadByHand(folder, files)
+                container.backup.pass()
+            }
+        },
     )
 }
 

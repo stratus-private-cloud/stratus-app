@@ -465,6 +465,25 @@ Three surfaces, and no more than three:
    climbs out of the folder, and the folder's pictures are taken when it
    opens so a refresh underneath cannot move the one on screen.
 
+   **And files can be put there by hand** (stratus-app#127), through the
+   system's picker into the folder on screen, with backup on or off. It is a
+   second way into `UploadQueue` and not a second queue: `enqueueByHand`
+   writes rows with a given path where `enqueue` derives one, stamped with the
+   moment they were picked so they sort first, and `pending.origin` says where
+   the bytes are -- `AssetSource` for the camera roll, `PickedFiles` for these
+   (a persistable grant on Android; a copy in the container on iOS, since a
+   security-scoped URL does not survive a relaunch). `Backup.pass` drains them
+   before and apart from the camera roll, so a pass with no folders chosen, no
+   photo access or a metered connection still sends them, under the same lock
+   and through the same negotiated transport. **A taken name lands beside the
+   original as ` (2)`**, the server's own `CopyName`: a `PUT` carries
+   `If-None-Match: *` and a 412 moves the row to the next copy; tus has no such
+   header, so the folder is asked with a `Depth: 0` `PROPFIND` per candidate
+   before the upload is created, and the name is the row's for good from then
+   on -- a resume never renames. `pending.numbered` is which copy is being
+   tried and is null once settled. Progress shows as a row in that folder and
+   not on the backup screen, whose counts are filtered to the camera roll.
+
    **Several can be deleted at once** (stratus-app#210): holding a row or a
    tile ticks it, as in any Android file manager, and the bar becomes the
    selection's. It is one `DELETE` per file and never anything batched,

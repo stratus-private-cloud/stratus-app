@@ -87,7 +87,8 @@ class Thumbnails(
     suspend fun of(entry: DavResource, width: Int): Thumbnail = of(entry.source ?: entry.path, width, entry.etag)
 
     /** [path] is as WebDAV gives it, leading slash and all. */
-    suspend fun of(path: String, width: Int, etag: String? = null): Thumbnail {
+    suspend fun of(path: String, asked: Int, etag: String? = null): Thumbnail {
+        val width = widthFor(asked)
         val instance = instances.instance() ?: return Thumbnail.None
         val key = "${instance.baseUrl} $path $width ${etag.orEmpty()}"
         recall(key)?.let { return it }
@@ -109,7 +110,8 @@ class Thumbnails(
      * the album's own address as `?cover=<pixels>` rather than being one of
      * its files. Under the same permits and the same refusal as a thumbnail.
      */
-    suspend fun cover(album: String, width: Int): Thumbnail {
+    suspend fun cover(album: String, asked: Int): Thumbnail {
+        val width = widthFor(asked)
         val instance = instances.instance() ?: return Thumbnail.None
         val key = "${instance.baseUrl} $album ?cover=$width"
         recall(key)?.let { return it }
@@ -192,3 +194,15 @@ class Thumbnails(
         private const val LONGEST_WAIT = 30_000L
     }
 }
+
+/**
+ * What a picture is asked for at: between the two sizes a Stratus makes ahead,
+ * 96 and 300 (stratus-app#239). Android's picker hands over whatever size its
+ * row is, and past 300 the server rounds up to 1200 and makes it on demand --
+ * seconds of decoding on a small server, for a picture that evicted the app's
+ * own tiles from the shared cache when it arrived.
+ */
+internal fun widthFor(asked: Int): Int = asked.coerceIn(SMALLEST_TILE, LARGEST_TILE)
+
+private const val SMALLEST_TILE = 96
+private const val LARGEST_TILE = 300

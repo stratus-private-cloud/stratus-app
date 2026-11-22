@@ -82,6 +82,20 @@ class ThumbnailsTest {
     }
 
     @Test
+    fun aPictureIsAskedForAtASizeTheServerHasMade() = runTest {
+        // stratus-app#239: the picker asks at its row's size, and past 300 a
+        // Stratus makes a 1200-pixel picture on demand.
+        val thumbs = thumbnails { HttpStatusCode.OK to "jpeg" }
+        thumbs.of("/files/a.jpg", 1200)
+        thumbs.of("/files/b.jpg", 50)
+        thumbs.cover("/music/Band/Record/", 1200)
+        assertEquals(
+            listOf("300", "96", "300"),
+            seen.map { it.url.parameters["size"] ?: it.url.parameters["cover"] },
+        )
+    }
+
+    @Test
     fun aFileInAGeneratedCollectionIsAskedForWhereItReallyIs() = runTest {
         // A recording listed under /videos/ has no signable address there, so
         // asking by its listed path sent nothing and every tile was blank.

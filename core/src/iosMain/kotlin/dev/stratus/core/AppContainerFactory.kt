@@ -89,6 +89,23 @@ fun appContainer(): AppContainer = plain
  */
 fun hostAppContainer(): AppContainer = hosting
 
+/**
+ * The upload session, made now, for the system's relaunch to report finished
+ * transfers (stratus-app#234). The container is built if nothing has built it
+ * yet -- a relaunch in the background may come before any screen -- and the
+ * session made at once, so the answers it was holding are delivered to it
+ * rather than waiting for a pass to ask. [delivered] is the system's
+ * completion handler, called once it has finished.
+ */
+fun uploadsForEvents(delivered: () -> Unit) {
+    hosting
+    val uploads = checkNotNull(uploadSession) { "building the container makes the session" }
+    // Before the session exists, or the system could finish reporting to a
+    // delegate with nobody yet told to let Swift go.
+    uploads.onEventsDelivered = delivered
+    uploads.connect()
+}
+
 private fun build(registersDomains: Boolean): AppContainer {
     val secure = CachedSecureStore(KeychainSecureStore(accessGroup = sharedKeychainGroup()))
     // Built before the container because the container's transports close over
@@ -147,8 +164,8 @@ private fun build(registersDomains: Boolean): AppContainer {
         uploads.allowsCellular = !instance.onlyOnWifi
         val credentials = ServerStore(secure).credentials()?.let(::basicAuthHeader)
         negotiateTus(connection.http, instance.baseUrl)
-            ?.let { BackgroundTusTransport(connection.http, it, uploads, credentials) }
-            ?: BackgroundPutTransport(instance.baseUrl, uploads, credentials)
+            ?.let { BackgroundTusTransport(connection.http, it, uploads, credentials, connection.dav) }
+            ?: BackgroundPutTransport(instance.baseUrl, uploads, credentials, connection.dav)
     },
     liveTransfers = { uploads.live().also { BackgroundUploads.sweep(it) } },
     handOverAtMost = HandOverBudget.Ios,

@@ -42,14 +42,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         handleEventsForBackgroundURLSession identifier: String,
         completionHandler: @escaping () -> Void
     ) {
-        // Building the container is what creates the session with this
-        // identifier, which is what makes the system deliver what it has been
-        // holding.
-        let session = AppContainerFactoryKt.uploadSession
-        session?.onEventsDelivered = { completionHandler() }
-        if session == nil {
-            completionHandler()
-        }
+        // The session with this identifier, made now: that is what makes the
+        // system deliver what it has been holding, before any pass can put a
+        // finished transfer back in the queue (stratus-app#234).
+        AppContainerFactoryKt.uploadsForEvents(delivered: { completionHandler() })
     }
 }
 

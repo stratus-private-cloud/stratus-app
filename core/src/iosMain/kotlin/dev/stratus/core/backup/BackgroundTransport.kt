@@ -1,5 +1,6 @@
 package dev.stratus.core.backup
 
+import dev.stratus.core.dav.DavClient
 import io.ktor.client.HttpClient
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSMutableURLRequest
@@ -28,6 +29,8 @@ class BackgroundTusTransport(
     endpoint: String,
     private val uploads: BackgroundUploads,
     private val credentials: String?,
+    /** What [alreadyThere] asks, before anything is handed over (stratus-app#234). */
+    private val dav: DavClient,
 ) : Transport {
 
     private val tus = TusProtocol(http, endpoint)
@@ -40,6 +43,7 @@ class BackgroundTusTransport(
         body: UploadBody,
         begun: suspend (Resume) -> Unit,
     ): UploadOutcome {
+        alreadyThere(dav, target)?.let { return it }
         // Where the server is, asked rather than assumed -- the same rule the
         // in-process transport follows, and for the same reason: a client can
         // believe it is somewhere the server does not agree with.
@@ -89,6 +93,8 @@ class BackgroundPutTransport(
     private val baseUrl: String,
     private val uploads: BackgroundUploads,
     private val credentials: String?,
+    /** What [alreadyThere] asks, before anything is handed over (stratus-app#234). */
+    private val dav: DavClient,
 ) : Transport {
 
     override val resumable = false
@@ -99,6 +105,7 @@ class BackgroundPutTransport(
         body: UploadBody,
         begun: suspend (Resume) -> Unit,
     ): UploadOutcome {
+        alreadyThere(dav, target)?.let { return it }
         val url = baseUrl.trimEnd('/') + "/" + target.path.trimStart('/')
         val request = NSMutableURLRequest.requestWithURL(NSURL(string = url)).apply {
             setHTTPMethod("PUT")

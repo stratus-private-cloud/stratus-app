@@ -219,12 +219,22 @@ class DavClient(
      * The [ByteArray] overload is for things small enough to hold; this is for
      * the videos the app exists to back up, where holding the body in memory to
      * send it is the difference between working and being killed for it.
+     *
+     * [exclusive] refuses to replace anything, as `If-None-Match: *`
+     * (RFC 9110 13.1.2), which comes back as [DavError.PreconditionFailed].
      */
-    suspend fun put(path: String, size: Long, body: RawSource, contentType: String? = null): String? {
+    suspend fun put(
+        path: String,
+        size: Long,
+        body: RawSource,
+        contentType: String? = null,
+        exclusive: Boolean = false,
+    ): String? {
         val response = http.request(url(path)) {
             method = HttpMethod.Put
             asTransfer()
             if (contentType != null) header(HttpHeaders.ContentType, contentType)
+            if (exclusive) header(HttpHeaders.IfNoneMatch, "*")
             setBody(sourceBody(size, body))
         }
         if (!response.status.isSuccess()) throw response.toError(path)

@@ -32,7 +32,10 @@ class BackupStatus(
         }
 
         val pending = database.pending()
-        val summary = pending.summary(now())
+        // The camera roll's rows and no others: a file picked by hand shows in
+        // the folder it is going into, and "1 waiting" under a heading about
+        // the backup would be a small lie about it (stratus-app#127).
+        val summary = pending.summary(now(), Origin.Library)
         val journal = database.journal().read()
 
         if (journal?.running == true && passing()) {

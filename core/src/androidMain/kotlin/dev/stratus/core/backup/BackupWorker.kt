@@ -52,7 +52,9 @@ class BackupWorker(
         }
 
         val backup = appContainer(applicationContext).backup
-        if (backup.enabled() == null) return Result.success()
+        // Not only a backup: a file picked by hand is sent with backup off,
+        // by the same chain a tap starts (stratus-app#127).
+        if (!backup.owed()) return Result.success()
 
         val foreground = intoTheForeground()
 

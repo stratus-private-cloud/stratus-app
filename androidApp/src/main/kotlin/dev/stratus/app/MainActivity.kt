@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import dev.stratus.core.appContainer
 import dev.stratus.core.backup.AndroidAssetSource
+import dev.stratus.core.backup.AndroidPickedFiles
 import dev.stratus.core.backup.BackupWorker
 import dev.stratus.core.session.Ask
 import dev.stratus.ui.App
@@ -61,6 +62,29 @@ class MainActivity : ComponentActivity() {
     // shown this request, so nobody should be sent anywhere when it fails.
     private val askForLocations = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
+    // Kept across the activity being recreated while the picker is up, which
+    // a phone short of memory does: the result arrives at the new instance.
+    private var uploadInto: String? = null
+
+    // The system's own picker, several at once, and a grant on each that
+    // outlives this process (stratus-app#127). What it hands back is queued
+    // and the same chain a tap starts sends it, with the app closed or not.
+    private val pickToUpload = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        val folder = uploadInto ?: return@registerForActivityResult
+        uploadInto = null
+        if (uris.isEmpty()) return@registerForActivityResult
+        lifecycleScope.launch {
+            val files = AndroidPickedFiles(applicationContext).describe(uris)
+            appContainer(applicationContext).backup.uploadByHand(folder, files)
+            BackupWorker.now(applicationContext)
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        uploadInto?.let { outState.putString(UPLOAD_INTO, it) }
+    }
+
     private fun permissionsFor(asks: Set<Ask>): Array<String> = buildList {
         if (Ask.Photos in asks) addAll(photos)
         // A runtime permission from Android 13 only; below it, notifications
@@ -74,6 +98,7 @@ class MainActivity : ComponentActivity() {
         // with the theme, which otherwise stay dark over a dark app.
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        uploadInto = savedInstanceState?.getString(UPLOAD_INTO)
         val container = appContainer(applicationContext)
         val back = BackRequests()
         shortcuts.opened.value = intent.getStringExtra(PART)
@@ -110,6 +135,10 @@ class MainActivity : ComponentActivity() {
                 onBackUpNow = { BackupWorker.now(applicationContext) },
                 onAsk = { asks -> askFor.launch(permissionsFor(asks)) },
                 shortcuts = shortcuts,
+                onUpload = { folder ->
+                    uploadInto = folder
+                    pickToUpload.launch(arrayOf("*/*"))
+                },
             )
         }
     }
@@ -141,6 +170,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val PART = "dev.stratus.app.PART"
+        const val UPLOAD_INTO = "dev.stratus.app.UPLOAD_INTO"
         val SHORTCUT_ICONS = mapOf(
             "files" to R.drawable.shortcut_files,
             "photos" to R.drawable.shortcut_photos,

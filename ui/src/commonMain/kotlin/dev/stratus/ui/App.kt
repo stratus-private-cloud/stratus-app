@@ -97,6 +97,11 @@ fun App(
     /** Asks the system for these permissions, in one request; null where nothing can ask yet. */
     onAsk: ((Set<Ask>) -> Unit)? = null,
     shortcuts: Shortcuts = Shortcuts(),
+    /**
+     * Opens the system's picker to upload into this folder, which only the
+     * platform can do; null where it cannot (stratus-app#127).
+     */
+    onUpload: ((String) -> Unit)? = null,
 ) {
     // Pinned to the main thread rather than left on the composition's own
     // dispatcher. A controller publishes state a screen reads, and a snapshot
@@ -136,6 +141,7 @@ fun App(
                     onBackUpNow = onBackUpNow,
                     onAsk = onAsk,
                     shortcuts = shortcuts,
+                    onUpload = onUpload,
                     baseUrl = current.baseUrl,
                     onEdit = { scope.launch { signIn.edit() } },
                     onInstancesChanged = { signIn.restore() },
@@ -168,6 +174,7 @@ private fun SignedIn(
     onBackUpNow: (() -> Unit)?,
     onAsk: ((Set<Ask>) -> Unit)?,
     shortcuts: Shortcuts,
+    onUpload: ((String) -> Unit)?,
     baseUrl: String,
     onEdit: () -> Unit,
     onInstancesChanged: suspend () -> Unit,
@@ -441,6 +448,13 @@ private fun SignedIn(
                         null
                     },
                     onEditServer = onEdit,
+                    // Files only: Photos, Music and Videos are what a Stratus
+                    // generates, and nothing can be put in them.
+                    onUpload = if (onUpload != null && part == Part.Files) {
+                        { onUpload(open.state.value.path) }
+                    } else {
+                        null
+                    },
                     banner = { BackupStrip(state.backupState) { go(Screen.Backup) } },
                     bottomBar = {
                         Column {

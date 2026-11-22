@@ -72,10 +72,21 @@ class BackupDatabase(
      * is a pass away from being queued again. So an older file is dropped.
      *
      * The rule from here is the ordinary one: a migration is added, never
-     * edited, and the next number is 8.
+     * edited, and the next number is 9.
      */
     suspend fun migrate() = withContext(io) {
-        if (version() >= SCHEMA) return@withContext
+        if (version() < 7) rewrite()
+        if (version() < 8) {
+            // Files picked by hand share the queue with the camera roll
+            // (stratus-app#127): where a row's bytes are, and which numbered
+            // copy of its name it is trying while that is not settled yet.
+            connection.execSQL("ALTER TABLE pending ADD COLUMN origin TEXT NOT NULL DEFAULT 'Library'")
+            connection.execSQL("ALTER TABLE pending ADD COLUMN numbered INTEGER")
+            connection.execSQL("PRAGMA user_version = 8")
+        }
+    }
+
+    private fun rewrite() {
         for (table in listOf("uploaded", "settled", "pending", "journal", "marks")) {
             connection.execSQL("DROP TABLE IF EXISTS $table")
         }
@@ -143,7 +154,7 @@ class BackupDatabase(
             """.trimIndent(),
         )
 
-        connection.execSQL("PRAGMA user_version = $SCHEMA")
+        connection.execSQL("PRAGMA user_version = 7")
     }
 
     /**
@@ -167,7 +178,4 @@ class BackupDatabase(
             if (statement.step()) statement.getLong(0).toInt() else 0
         }
 
-    private companion object {
-        const val SCHEMA = 7
-    }
 }

@@ -34,5 +34,6 @@ skip_next
 skip_previous
 stop
 table_chart
+upload
 visibility
 wifi

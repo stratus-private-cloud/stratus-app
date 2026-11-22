@@ -19,6 +19,8 @@ class UploadRecords(
     private val pending: PendingStore,
     private val cache: BackupCache,
     private val now: () -> Long = { getTimeMillis() },
+    /** Told when a file picked by hand has gone, so its grant or its copy can go too. */
+    private val picked: PickedFiles? = null,
 ) {
     /**
      * The answer to something handed over, as the platform saw it.
@@ -58,10 +60,16 @@ class UploadRecords(
     suspend fun record(upload: PendingUpload, outcome: UploadOutcome): QueueStep =
         when (outcome) {
             is UploadOutcome.Done -> {
+                // Settled even when picked by hand (stratus-app#127): a row
+                // nobody reads, against a record that stays one table with one
+                // rule.
                 cache.record(upload.path)
                 pending.remove(upload.path)
+                if (upload.origin == Origin.Picked) picked?.forget(upload.localId)
                 QueueStep.Uploaded(upload.path)
             }
+
+            is UploadOutcome.Taken -> taken(upload)
 
             is UploadOutcome.Interrupted -> {
                 // The handle goes down either way, or resuming would ask the
@@ -86,6 +94,23 @@ class UploadRecords(
 
             is UploadOutcome.Failed -> failure(upload, outcome.kind, outcome.detail)
         }
+
+    /**
+     * The next copy of the name, ` (2)` after the name itself, as the server's
+     * import folder numbers (stratus-app#127). Runnable at once and charged
+     * nothing: nothing is wrong with the file, and the next turn asks about
+     * the next name. Skipping a path another row holds keeps the key unique.
+     */
+    private suspend fun taken(upload: PendingUpload): QueueStep {
+        val n = upload.numbered ?: 1
+        val original = originalName(upload.path, n)
+        var next = n + 1
+        while (next <= MOST_COPIES && pending.contains(copyName(original, next))) next++
+        if (next > MOST_COPIES) return failure(upload, FailureKind.Permanent, "$MOST_COPIES files already have this name")
+        val path = copyName(original, next)
+        pending.rename(upload.path, path, next)
+        return QueueStep.Retrying(path, 0, "${upload.path.substringAfterLast('/')} is taken")
+    }
 
     private suspend fun failure(upload: PendingUpload, kind: FailureKind, detail: String): QueueStep =
         if (kind == FailureKind.Permanent) {

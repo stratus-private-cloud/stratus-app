@@ -1,6 +1,7 @@
 package dev.stratus.core.backup
 
 import dev.stratus.core.dav.DavClient
+import dev.stratus.core.dav.DavPath
 import io.ktor.client.HttpClient
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSMutableURLRequest
@@ -105,11 +106,17 @@ class BackgroundPutTransport(
         body: UploadBody,
         begun: suspend (Resume) -> Unit,
     ): UploadOutcome {
-        alreadyThere(dav, target)?.let { return it }
-        val url = baseUrl.trimEnd('/') + "/" + target.path.trimStart('/')
+        // Not for a name still being claimed (stratus-app#127): there, a file
+        // of the same size is somebody else's `scan.pdf`, and the answer is
+        // the 412 that moves this one to ` (2)`.
+        if (!target.exclusive) alreadyThere(dav, target)?.let { return it }
+        // Encoded, since a name picked by hand is whatever somebody called it,
+        // spaces and ` (2)` included, and NSURL answers nil for a raw space.
+        val url = baseUrl.trimEnd('/') + "/" + DavPath.encodePath(target.path.trimStart('/'))
         val request = NSMutableURLRequest.requestWithURL(NSURL(string = url)).apply {
             setHTTPMethod("PUT")
             target.contentType?.let { setValue(it, forHTTPHeaderField = "Content-Type") }
+            if (target.exclusive) setValue("*", forHTTPHeaderField = "If-None-Match")
             credentials?.let { setValue(it, forHTTPHeaderField = "Authorization") }
         }
         val ticket = uploads.start(request) { spool -> body.writeTo(0, spool.toString()) }

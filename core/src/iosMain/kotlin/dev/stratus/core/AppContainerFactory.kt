@@ -2,6 +2,7 @@ package dev.stratus.core
 
 import dev.stratus.core.calendars.IosCalendarHandoff
 import dev.stratus.core.backup.IosAssetSource
+import dev.stratus.core.backup.IosPickedFiles
 import dev.stratus.core.files.IosFileHandoff
 import dev.stratus.core.play.IosPlayer
 import dev.stratus.core.play.IosVideoScreen
@@ -142,6 +143,7 @@ private fun build(registersDomains: Boolean): AppContainer {
     ),
     databasePath = databasePath(),
     assets = IosAssetSource(),
+    picked = IosPickedFiles(),
     network = IosNetwork(),
     // The app's alone: the File Provider extension has nothing to play.
     player = if (registersDomains) IosPlayer() else null,

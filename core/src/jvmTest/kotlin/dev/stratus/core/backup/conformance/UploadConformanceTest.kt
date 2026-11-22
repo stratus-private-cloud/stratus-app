@@ -17,6 +17,10 @@ import dev.stratus.core.backup.transportFor
 import dev.stratus.core.backup.QueueStep
 import dev.stratus.core.backup.RemoteLayout
 import dev.stratus.core.backup.UploadQueue
+import dev.stratus.core.backup.PickedFile
+import dev.stratus.core.backup.PickedFiles
+import dev.stratus.core.backup.enqueueByHand
+import dev.stratus.core.backup.isTaken
 import dev.stratus.core.dav.DavClient
 import dev.stratus.core.net.Credentials
 import dev.stratus.core.net.originOf
@@ -166,5 +170,48 @@ class UploadConformanceTest {
 
         assertTrue(two.stat(layout.directoryFor(asset)).isDirectory)
         assertEquals(emptyList(), queue.outstanding())
+    }
+
+    /**
+     * A file picked by hand into a folder that already has one of its name
+     * lands beside it, by both transports the app negotiates between
+     * (stratus-app#127): `If-None-Match: *` refused with a 412 over `PUT`,
+     * and the folder asked first over tus, whose creation has no such header.
+     */
+    @Test
+    fun aFilePickedByHandLandsBesideOneOfTheSameNameByEitherTransport() = runTest {
+        val origin = originOf(requireNotNull(System.getenv("STRATUS_TEST_URL")))
+        val fromOrigin = davAt(origin)
+        val folder = "/files/hand-${Random.nextLong().toULong().toString(16)}/"
+        fromOrigin.makeCollection(folder)
+        fromOrigin.put(folder + "scan.pdf", byteArrayOf(1, 2, 3))
+
+        val picked = object : PickedFiles {
+            override suspend fun open(id: String, from: Long): RawSource =
+                Buffer().apply { write(bytes, from.toInt(), bytes.size) }
+        }
+        val tus = transportFor(Connection(stratusHttpClient(CIO.create(), credentials), fromOrigin), origin)
+        assertTrue(tus is TusTransport, "this server offers tus, so a pass should have taken it")
+
+        database.migrate()
+        for (transport in listOf(PutTransport(fromOrigin), tus)) {
+            database.pending().enqueueByHand(folder, listOf(PickedFile("picked", "scan.pdf", bytes.size.toLong(), null)), 1)
+            val queue = UploadQueue(
+                layout = layout,
+                pending = database.pending(),
+                cache = database.cache(),
+                source = source,
+                transport = transport,
+                directories = DavDirectoryMaker(fromOrigin),
+                picked = picked,
+                taken = { isTaken(fromOrigin, it) },
+            )
+            val steps = drain(queue)
+            assertTrue(steps.any { it is QueueStep.Uploaded }, "nothing was uploaded: $steps")
+        }
+
+        assertEquals(3L, fromOrigin.stat(folder + "scan.pdf").size, "the original was replaced")
+        assertEquals(bytes.size.toLong(), fromOrigin.stat(folder + "scan (2).pdf").size, "PUT")
+        assertEquals(bytes.size.toLong(), fromOrigin.stat(folder + "scan (3).pdf").size, "tus")
     }
 }

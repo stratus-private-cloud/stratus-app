@@ -1,6 +1,7 @@
 package dev.stratus.core.backup
 
 import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 import androidx.sqlite.SQLiteStatement
 import dev.stratus.core.sql.use
 import kotlinx.coroutines.CoroutineDispatcher
@@ -66,7 +67,35 @@ class PendingStore(
      * away the offset an upload already reached, or a large video restarts every
      * time the app looks at the camera roll.
      */
-    suspend fun add(upload: PendingUpload) = withContext(io) {
+    /**
+     * Queues all of [uploads] in one transaction and answers how many were new:
+     * one already queued is ignored, so a large video half sent is not reset,
+     * and is not counted either -- the log's "queued" said otherwise
+     * (stratus-app#240). One transaction rather than one per row, which is a
+     * first pass over a camera roll of thousands.
+     */
+    suspend fun addAll(uploads: List<PendingUpload>): Int = withContext(io) {
+        if (uploads.isEmpty()) return@withContext 0
+        val before = count()
+        connection.execSQL("BEGIN")
+        try {
+            for (upload in uploads) insert(upload)
+            connection.execSQL("COMMIT")
+        } catch (e: Throwable) {
+            connection.execSQL("ROLLBACK")
+            throw e
+        }
+        count() - before
+    }
+
+    private fun count(): Int = connection.prepare("SELECT COUNT(*) FROM pending").use { statement ->
+        statement.step()
+        statement.getInt(0)
+    }
+
+    suspend fun add(upload: PendingUpload) = withContext(io) { insert(upload) }
+
+    private fun insert(upload: PendingUpload) {
         connection.prepare(
             """
             INSERT OR IGNORE INTO pending
@@ -82,7 +111,6 @@ class PendingStore(
             statement.bindText(6, upload.takenAt)
             statement.step()
         }
-        Unit
     }
 
     /**

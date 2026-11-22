@@ -18,12 +18,15 @@ internal fun sourceBody(size: Long, source: RawSource): OutgoingContent =
         override val contentLength: Long = size
 
         override suspend fun writeTo(channel: ByteWriteChannel) {
-            val buffered = source.buffered()
-            val chunk = ByteArray(CHUNK_BYTES)
-            while (true) {
-                val read = buffered.readAtMostTo(chunk, 0, chunk.size)
-                if (read <= 0) break
-                channel.writeFully(chunk, 0, read)
+            // Closed when written, or a file descriptor per upload waited for
+            // the collector (stratus-app#240).
+            source.buffered().use { buffered ->
+                val chunk = ByteArray(CHUNK_BYTES)
+                while (true) {
+                    val read = buffered.readAtMostTo(chunk, 0, chunk.size)
+                    if (read <= 0) break
+                    channel.writeFully(chunk, 0, read)
+                }
             }
             channel.flush()
         }

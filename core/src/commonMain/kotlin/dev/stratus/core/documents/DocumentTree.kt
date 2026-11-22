@@ -1,5 +1,6 @@
 package dev.stratus.core.documents
 
+import dev.stratus.core.files.sortedForPeople
 import dev.stratus.core.backup.Connection
 import dev.stratus.core.backup.Connections
 import dev.stratus.core.dav.DavClient
@@ -129,7 +130,7 @@ class DocumentTree(
      */
     suspend fun listNow(ref: DocumentRef): List<DocumentRow> {
         val dav = requireNotNull(dav()) { "no such server" }
-        return dav.list(ref.davPath).map(::rowOf).sortedForPeople()
+        return dav.list(ref.davPath).sortedForPeople().map(::rowOf)
     }
 
     /** Throws the cached answer away and asks again. What pull-to-refresh is. */
@@ -266,6 +267,10 @@ class DocumentTree(
             lock.withLock {
                 listings[ref] = answer
                 fetching.remove(ref)
+                // Bounded, oldest answer first, or every folder a picker ever
+                // opened stayed for the life of the process (stratus-app#240).
+                val oldest = listings.keys.filter { it !in fetching && it != ref }
+                oldest.take(maxOf(0, listings.size - MOST_LISTINGS)).forEach { listings.remove(it) }
             }
             changed(ref)
         }
@@ -294,13 +299,13 @@ class DocumentTree(
         )
     }
 
-    private fun List<DocumentRow>.sortedForPeople(): List<DocumentRow> =
-        sortedWith(compareByDescending<DocumentRow> { it.isDirectory }.thenBy { it.name.lowercase() })
-
     companion object {
         /** Android's own name for a folder, which the picker matches on exactly. */
         const val MIME_DIRECTORY = "vnd.android.document/directory"
 
         private const val CHUNK = 64L * 1024
+
+        /** Folders whose answers are kept: a picker's worth of walking back and forth. */
+        private const val MOST_LISTINGS = 64
     }
 }

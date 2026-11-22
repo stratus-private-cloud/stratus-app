@@ -52,7 +52,7 @@ class UploadQueue(
     /** Queues whatever the server has not got. Returns how much was added. */
     suspend fun enqueue(assets: List<Asset>): Int {
         val known = cache.paths()
-        var added = 0
+        val wanted = mutableListOf<PendingUpload>()
         for (asset in assets) {
             val parts = buildList {
                 add(Part(AssetPart.Still, layout.pathFor(asset), asset.sizeBytes, asset.mimeType))
@@ -60,7 +60,7 @@ class UploadQueue(
             }
             for ((part, path, size, type) in parts) {
                 if (path in known) continue
-                pending.add(
+                wanted.add(
                     PendingUpload(
                         path = path,
                         localId = asset.localId,
@@ -70,10 +70,9 @@ class UploadQueue(
                         takenAt = stampOf(asset),
                     ),
                 )
-                added++
             }
         }
-        return added
+        return pending.addAll(wanted)
     }
 
     /**

@@ -213,7 +213,7 @@ class BackupWorker(
          * dropped without a word, and that pass had already looked at the
          * camera roll -- so the photograph just taken, which is why anybody
          * taps, waited six hours (stratus-app#188). A pass with nothing new is
-         * a listing of the roll and no request, so a few taps cost nothing.
+         * a listing of the roll and one `OPTIONS`, so a few taps cost nothing.
          */
         fun now(context: Context) = enqueueOnce(context, Constraints.Builder().build())
 

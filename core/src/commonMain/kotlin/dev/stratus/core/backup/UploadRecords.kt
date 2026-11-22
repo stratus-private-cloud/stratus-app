@@ -21,6 +21,8 @@ class UploadRecords(
     private val now: () -> Long = { getTimeMillis() },
     /** Told when a file picked by hand has gone, so its grant or its copy can go too. */
     private val picked: PickedFiles? = null,
+    /** Told when a file picked by hand has arrived, so the folder it went into can list it. */
+    private val arrived: () -> Unit = {},
 ) {
     /**
      * The answer to something handed over, as the platform saw it.
@@ -65,7 +67,10 @@ class UploadRecords(
                 // rule.
                 cache.record(upload.path)
                 pending.remove(upload.path)
-                if (upload.origin == Origin.Picked) picked?.forget(upload.localId)
+                if (upload.origin == Origin.Picked) {
+                    picked?.forget(upload.localId)
+                    arrived()
+                }
                 QueueStep.Uploaded(upload.path)
             }
 

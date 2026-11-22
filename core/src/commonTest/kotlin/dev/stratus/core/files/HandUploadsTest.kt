@@ -27,6 +27,7 @@ private class NoHandoff : FileHandoff {
 private class Uploading : HandUploads {
     val going = MutableStateFlow<List<HandUpload>>(emptyList())
     val cancelled = MutableStateFlow<List<String>>(emptyList())
+    override val arrivals = MutableStateFlow(0)
     override fun into(folder: String): Flow<List<HandUpload>> =
         going.map { all -> all.filter { it.path.substringBeforeLast('/').trim('/') == folder.trim('/') } }
     override suspend fun cancel(path: String) {
@@ -68,7 +69,7 @@ class HandUploadsTest {
     }
 
     @Test
-    fun theRowBecomesTheFileWhenItIsSent() = runTest {
+    fun theFolderIsListedAgainWhenAnUploadArrives() = runTest {
         // A flow and not a counter: the mock engine answers off the test
         // dispatcher, so there is nothing to advance, only something to wait for.
         val listings = MutableStateFlow(0)
@@ -96,6 +97,7 @@ class HandUploadsTest {
         assertEquals(listOf(going), browser.state.first { it.uploads.isNotEmpty() }.uploads)
 
         uploads.going.value = emptyList()
+        uploads.arrivals.value = 1
         browser.state.first { it.uploads.isEmpty() }
         listings.first { it > before }
 

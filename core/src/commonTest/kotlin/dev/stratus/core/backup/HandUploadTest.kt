@@ -306,6 +306,7 @@ class HandUploadTest {
         assertEquals(0, roll.looked, "the camera roll was enumerated with backup off")
         assertEquals(emptyList(), backup.handUploads())
         assertFalse(backup.owed())
+        assertEquals(1, backup.arrivals.value, "the folder would not have been told")
     }
 
     @Test

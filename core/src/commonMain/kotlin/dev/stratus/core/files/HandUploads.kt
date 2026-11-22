@@ -41,6 +41,9 @@ interface HandUploads {
     /** What is going into [folder], again whenever it changes, for as long as it is collected. */
     fun into(folder: String): Flow<List<HandUpload>>
 
+    /** Counts each upload that arrives, anywhere; a change is a reason to list the folder again. */
+    val arrivals: Flow<Int>
+
     /** Takes one off the queue, which is the only way to be rid of one that failed. */
     suspend fun cancel(path: String)
 }
@@ -62,6 +65,8 @@ class QueuedHandUploads(
             delay(every)
         }
     }.distinctUntilChanged()
+
+    override val arrivals: Flow<Int> = backup.arrivals
 
     override suspend fun cancel(path: String) = backup.cancelHandUpload(path)
 }

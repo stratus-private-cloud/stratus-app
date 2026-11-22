@@ -11,6 +11,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -93,6 +94,15 @@ class Backup(
 
     /** How far each hand upload being sent in this process has got, by path. */
     val progress: StateFlow<Map<String, Long>> = sent.asStateFlow()
+
+    private val landed = MutableStateFlow(0)
+
+    /**
+     * How many hand uploads have arrived in this process's life, for a folder
+     * to list itself again. A count rather than the rows leaving the queue,
+     * which a small file does between two looks at it.
+     */
+    val arrivals: StateFlow<Int> = landed.asStateFlow()
 
     /** What to say about the backup, assembled from what the queue actually holds. */
     val status: BackupStatus by lazy {
@@ -268,6 +278,7 @@ class Backup(
                 picked = picked,
                 taken = { path -> isTaken(connection.dav, path) },
                 progress = sent,
+                arrived = { landed.update { it + 1 } },
             ),
             index = BackupIndex(layout, cache, connection.dav),
             mark = database.mark(),
@@ -288,7 +299,7 @@ class Backup(
     /** Puts back everything the platform has forgotten it was carrying. */
     suspend fun reconcile(live: Set<String>): Int = records().reconcile(live)
 
-    private suspend fun records() = UploadRecords(database.pending(), database.cache(), now, picked)
+    private suspend fun records() = UploadRecords(database.pending(), database.cache(), now, picked) { landed.update { it + 1 } }
 
     /** What has gone wrong with the backup, with what the server said about each, bounded. */
     suspend fun failures(limit: Int = 20): List<PendingUpload> =

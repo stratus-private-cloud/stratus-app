@@ -14,6 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.exhausted
@@ -120,9 +121,9 @@ class BrowserController(
 
     /**
      * Follows what is being uploaded into [path], and lists the folder again
-     * when one of them leaves the queue -- which is when it became a file
-     * there, or was taken away (stratus-app#127). The row goes and the file
-     * takes its place in the same listing.
+     * whenever an upload arrives (stratus-app#127). Told rather than inferred
+     * from a row leaving the queue: a small file is picked, sent and gone
+     * between two looks at the queue, and the folder never learned it was there.
      */
     private fun watch(path: String) {
         val uploads = uploads ?: return
@@ -131,14 +132,9 @@ class BrowserController(
         watched = path
         mutable.value = mutable.value.copy(uploads = emptyList())
         watching = scope.launch {
-            var before = emptySet<String>()
-            uploads.into(path).collect { now ->
-                val here = now.mapTo(mutableSetOf()) { it.path }
-                mutable.value = mutable.value.copy(uploads = now)
-                if ((before - here).isNotEmpty() && running?.isActive != true) {
-                    running = scope.launch { load(path) }
-                }
-                before = here
+            launch { uploads.into(path).collect { now -> mutable.value = mutable.value.copy(uploads = now) } }
+            uploads.arrivals.drop(1).collect {
+                if (running?.isActive != true) running = scope.launch { load(path) }
             }
         }
     }

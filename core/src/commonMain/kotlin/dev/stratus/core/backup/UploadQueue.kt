@@ -62,6 +62,8 @@ class UploadQueue(
     private val taken: suspend (String) -> Boolean = { false },
     /** How far each hand upload's bytes have been read, for the folder it is going into. */
     private val progress: MutableStateFlow<Map<String, Long>>? = null,
+    /** Told when a hand upload arrives. */
+    private val arrived: () -> Unit = {},
 ) {
     /** Queues whatever the server has not got. Returns how much was added. */
     suspend fun enqueue(assets: List<Asset>): Int {
@@ -195,7 +197,7 @@ class UploadQueue(
      * builds another over the same two tables. Both end in the same code,
      * which is the point.
      */
-    private val records = UploadRecords(pending, cache, now, picked)
+    private val records = UploadRecords(pending, cache, now, picked, arrived)
 
     suspend fun settle(ticket: String, answer: TransferAnswer): QueueStep = records.settle(ticket, answer)
 

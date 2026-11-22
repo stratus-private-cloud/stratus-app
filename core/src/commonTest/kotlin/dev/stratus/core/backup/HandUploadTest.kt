@@ -48,6 +48,8 @@ private class WatchedRoll : AssetSource {
 private class Picks : PickedFiles {
     val opened = mutableListOf<Pair<String, Long>>()
     val forgotten = mutableListOf<String>()
+    val left = mutableListOf<PickedFile>()
+    override suspend fun shared() = left.toList().also { left.clear() }
     override suspend fun open(id: String, from: Long): RawSource {
         opened += id to from
         return Buffer().apply { write(ByteArray(10), from.toInt(), 10) }
@@ -116,7 +118,18 @@ class HandUploadTest {
         // Settled like a photograph: one table, one rule.
         assertTrue(database.cache().has("files/docs/scan.pdf"))
         assertEquals(listOf("content://scan"), picks.forgotten, "the grant outlived the upload")
-        // The folder is the one somebody was looking at, so nothing asks to make it.
+        // Asked for, since a share's month may not exist yet (stratus-app#128).
+        assertEquals(listOf("files/docs/"), made)
+    }
+
+    @Test
+    fun aFolderOneSegmentDeepIsNeverAskedToBeMade() = runTest {
+        // On a Stratus that is files/ itself, which answers neither 201 nor 405.
+        val transport = ScriptedTransport(false, mutableListOf(UploadOutcome.Done(null)))
+        val queue = queue(transport)
+        pick(scan, into = "/files/")
+
+        assertEquals(QueueStep.Uploaded("files/scan.pdf", byHand = true), queue.runNext())
         assertEquals(emptyList(), made)
     }
 
@@ -267,6 +280,7 @@ class HandUploadTest {
 
     /** Paths the server holds, as the client would write them. */
     private val holds = mutableSetOf<String>()
+    private val folders = mutableSetOf("/files", "/files/docs")
 
     private val connections = Connections { instance ->
         val engine = MockEngine { request ->
@@ -287,6 +301,14 @@ class HandUploadTest {
                 } else {
                     respond("", HttpStatusCode.NotFound)
                 }
+                "MKCOL" -> when {
+                    path.trimEnd('/') in folders -> respond("", HttpStatusCode.MethodNotAllowed)
+                    path.trimEnd('/').substringBeforeLast('/') in folders -> {
+                        folders += path.trimEnd('/')
+                        respond("", HttpStatusCode.Created)
+                    }
+                    else -> respond("", HttpStatusCode.Conflict)
+                }
                 "PUT" -> if (path in holds && request.headers["If-None-Match"] == "*") {
                     respond("", HttpStatusCode.PreconditionFailed)
                 } else {
@@ -303,7 +325,7 @@ class HandUploadTest {
     }
 
     private val roll = WatchedRoll()
-    private val backup = Backup(instances, database, roll, connections, picked = picks)
+    private val backup = Backup(instances, database, roll, connections, picked = picks, now = { pickedAt })
 
     private suspend fun signedIn(sources: Set<String> = emptySet()) {
         instances.put(Server("https://host/", "edu", sources = sources), Credentials("edu", "secret"))
@@ -363,5 +385,76 @@ class HandUploadTest {
 
         assertEquals("/files/docs/scan.pdf", puts().first())
         assertEquals(1, roll.looked)
+    }
+
+    // ---- The share sheet (stratus-app#128) ----------------------------------
+
+    @Test
+    fun aShareLandsInTheMonthBesideTheBackupMadeOnTheWay() = runTest {
+        signedIn()
+        val photo = PickedFile("content://photo", "", 10, "image/jpeg")
+
+        assertEquals(ShareOutcome.Queued("files/shared/2026/10", 2), backup.share(listOf(scan, photo)))
+        backup.pass()
+
+        assertEquals(
+            setOf("/files/shared/2026/10/scan.pdf", "/files/shared/2026/10/2026-10-02 09-00-00.jpg"),
+            puts().toSet(),
+        )
+        assertTrue("/files/shared/2026/10" in folders, "the month was never made")
+    }
+
+    @Test
+    fun aShareNeverReplaces() = runTest {
+        signedIn()
+        folders += listOf("/files/shared", "/files/shared/2026", "/files/shared/2026/10")
+        holds += "/files/shared/2026/10/scan.pdf"
+
+        backup.share(listOf(scan))
+        backup.pass()
+
+        assertEquals("/files/shared/2026/10/scan (2).pdf", puts().last())
+    }
+
+    @Test
+    fun aShareWithNobodySignedInIsLetGoOf() = runTest {
+        assertEquals(ShareOutcome.SignedOut, backup.share(listOf(scan)))
+        assertEquals(listOf("content://scan"), picks.forgotten)
+        assertEquals(emptyList(), backup.handUploads())
+    }
+
+    @Test
+    fun aShareOfNoFileIsNotAFile() = runTest {
+        signedIn()
+        assertEquals(ShareOutcome.NotAFile, backup.share(emptyList()))
+    }
+
+    @Test
+    fun theSharesFolderIsBesideTheBackupsWhereverThatIs() {
+        val at = utcMillis(2026, 1, 31, 23, 59, 59)
+        assertEquals("files/shared/2026/01", shareFolder("files/phone_backup", at))
+        assertEquals("shared/2026/01", shareFolder("/phone/", at))
+        assertEquals("a/b/shared/2026/01", shareFolder("a/b/c", at))
+    }
+
+    @Test
+    fun aNamelessShareIsNamedAsTheServerWouldNameIt() {
+        val at = utcMillis(2026, 1, 31, 23, 59, 59)
+        assertEquals("2026-01-31 23-59-59.jpg", sharedName(null, "image/jpeg", at))
+        assertEquals("2026-01-31 23-59-59.mp4", sharedName("  ", "video/mp4; codecs=avc1", at))
+        assertEquals("2026-01-31 23-59-59", sharedName(null, "application/x-thing", at))
+        assertEquals("note.txt", sharedName("dir/note.txt", "text/plain", at))
+    }
+
+    @Test
+    fun whatAShareExtensionLeftIsTakenInByTheNextPass() = runTest {
+        signedIn()
+        picks.left += scan
+
+        backup.pass()
+
+        assertEquals(listOf("/files/shared/2026/10/scan.pdf"), puts())
+        assertEquals(PassOutcome.Finished, backup.pass())
+        assertEquals(1, puts().size, "a share was taken in twice")
     }
 }

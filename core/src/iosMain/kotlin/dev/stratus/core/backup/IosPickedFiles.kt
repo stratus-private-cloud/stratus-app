@@ -101,6 +101,45 @@ class IosPickedFiles : PickedFiles {
         }
     }
 
+    /**
+     * What the Share Extension left in the App Group (stratus-app#128): a
+     * folder per share, renamed from `.part` only once every file in it was
+     * written, so a share caught halfway is left for the next pass. Each file
+     * is moved here exactly as a picked one is, out of a folder of its own
+     * within the share, since two of them are often both called image.jpg.
+     */
+    override suspend fun shared(): List<PickedFile> = withContext(Dispatchers.Default) {
+        waitingShares().flatMap { share ->
+            val slots = SystemFileSystem.list(share)
+            val kept = slots.flatMap { SystemFileSystem.list(it) }.mapNotNull { file ->
+                try {
+                    keep(NSURL.fileURLWithPath(file.toString()))
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            try {
+                slots.forEach { SystemFileSystem.delete(it) }
+                SystemFileSystem.delete(share)
+            } catch (_: Exception) {
+                // A file that would not move stays, and is tried by the next pass.
+            }
+            kept
+        }
+    }
+
+    /** Whether a share is waiting, which is what decides that opening the app starts a pass. */
+    fun hasShares(): Boolean = waitingShares().isNotEmpty()
+
+    private fun waitingShares(): List<Path> {
+        val inbox = NSFileManager.defaultManager
+            .containerURLForSecurityApplicationGroupIdentifier(APP_GROUP)?.path
+            ?.let { Path(it, "Shares") }
+            ?: return emptyList()
+        if (!SystemFileSystem.exists(inbox)) return emptyList()
+        return SystemFileSystem.list(inbox).filterNot { it.name.endsWith(".part") }
+    }
+
     private fun folder(): String {
         val support = NSFileManager.defaultManager
             .URLsForDirectory(NSApplicationSupportDirectory, NSUserDomainMask)
@@ -126,5 +165,10 @@ class IosPickedFiles : PickedFiles {
         override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
             done(emptyList())
         }
+    }
+
+    private companion object {
+        /** The group the app shares with its extensions, the File Provider's document group too. */
+        const val APP_GROUP = "group.dev.stratus"
     }
 }

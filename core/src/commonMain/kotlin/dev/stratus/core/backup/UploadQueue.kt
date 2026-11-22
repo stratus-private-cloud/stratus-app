@@ -113,12 +113,14 @@ class UploadQueue(
         // how a file reaches a thirty-two minute wait without ever having been
         // refused (stratus-app#134).
         //
-        // Not for a file picked by hand, which goes into the folder somebody
-        // was looking at: asking to make it is a request for nothing, and on a
-        // Stratus the folder may be `files/` itself, which its router owns
-        // and answers with neither 201 nor 405.
+        // For a file picked by hand too, since a share goes into a month that
+        // may not exist yet (stratus-app#128) -- once a pass per folder, and
+        // an answer of "already there" for the folder somebody was looking at.
+        // Never for one a single segment deep: on a Stratus that is `files/`
+        // itself, which its router owns and answers with neither 201 nor 405.
         try {
-            if (!byHand) directories.ensure(upload.path.substringBeforeLast('/') + "/")
+            val folder = upload.path.substringBeforeLast('/', "")
+            if (!byHand || '/' in folder.trim('/')) directories.ensure("$folder/")
             // Once, before the first byte, and never on a resume: the name
             // travels in the upload's metadata, so a row with a handle has
             // already chosen it (stratus-app#127).

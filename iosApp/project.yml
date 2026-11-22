@@ -55,6 +55,9 @@ targets:
       path: Sources/Stratus.entitlements
       properties:
         com.apple.developer.networking.multicast: true
+        # Where the Share Extension leaves what was shared (stratus-app#128).
+        com.apple.security.application-groups:
+          - group.dev.stratus
     settings:
       base:
         # One 1024px square and nothing else: Xcode has downsampled every other
@@ -77,6 +80,7 @@ targets:
       # The extension travels inside the app, which is what makes it appear
       # under Locations in Files.
       - target: StratusFileProvider
+      - target: StratusShare
 
   # The library as a place to open from and save into (stratus-app#105).
   #
@@ -113,3 +117,36 @@ targets:
     dependencies:
       - framework: ../core/build/bin/iosSimulatorArm64/debugFramework/StratusCore.framework
         embed: false
+
+  # Stratus in the share sheet (stratus-app#128). Swift and nothing else: it
+  # copies into the App Group and the app's next pass takes it in, so it links
+  # no Kotlin framework and stays far inside an extension's memory budget.
+  StratusShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Share
+    info:
+      path: Share/Info.plist
+      properties:
+        CFBundleDisplayName: Stratus
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          # Files, photographs and films, several at once as a gallery sends
+          # them. Not text or links: the sheet does not offer Stratus for those.
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsFileWithMaxCount: 50
+              NSExtensionActivationSupportsImageWithMaxCount: 50
+              NSExtensionActivationSupportsMovieWithMaxCount: 50
+    entitlements:
+      path: Share/StratusShare.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.stratus
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.stratus.Stratus.Share
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO

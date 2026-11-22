@@ -681,6 +681,20 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun anOriginalSeenOnceIsNotDownloadedAgain() = runTest {
+        // stratus-app#238: swiping back was the same sixty megabytes again.
+        val browser = controller(this) { HttpStatusCode.OK to "the bytes" }
+        val photo = DavResource("/files/a.heic", isDirectory = false, size = 9, etag = "e1")
+        browser.original(photo)
+        assertEquals("the bytes", (browser.original(photo) as Original.Bytes).bytes.decodeToString())
+        assertEquals(1, seen.size)
+
+        // Changed on the server, it is fetched again.
+        browser.original(photo.copy(etag = "e2"))
+        assertEquals(2, seen.size)
+    }
+
+    @Test
     fun anOriginalTheServerRefusesIsAFailure() = runTest {
         val browser = controller(this) { HttpStatusCode.NotFound to "" }
         assertEquals(Original.Failed, browser.original(DavResource("/files/a.jpg", isDirectory = false)))

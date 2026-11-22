@@ -4,9 +4,12 @@ import android.Manifest
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import androidx.core.content.ContextCompat
+import java.io.InputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.io.RawSource
@@ -95,7 +98,7 @@ class AndroidAssetSource(private val context: Context) : AssetSource {
     override suspend fun open(localId: String, part: AssetPart, from: Long): RawSource =
         withContext(Dispatchers.IO) {
             val uri = ContentUris.withAppendedId(CONTENT_URI, localId.toLong())
-            val stream = requireNotNull(context.contentResolver.openInputStream(uri)) {
+            val stream = requireNotNull(original(uri) ?: context.contentResolver.openInputStream(uri)) {
                 "the library would not open $localId"
             }
             // Skipping rather than reading and discarding where the stream can,
@@ -110,11 +113,36 @@ class AndroidAssetSource(private val context: Context) : AssetSource {
         }
 
     /**
+     * The file with its location in it (stratus-app#228).
+     *
+     * Since Android 10 the platform zeroes the GPS in a photograph's EXIF, and a
+     * video's location, for an app that did not take it -- keeping the size, so
+     * nothing downstream can tell. Undoing that takes this permission and a URI
+     * that asks for the original. Without them the redacted copy is still sent:
+     * a photograph without its place is a smaller loss than no photograph.
+     */
+    private fun original(uri: Uri): InputStream? {
+        if (!has(Manifest.permission.ACCESS_MEDIA_LOCATION)) return null
+        return try {
+            context.contentResolver.openInputStream(MediaStore.setRequireOriginal(uri))
+        } catch (e: SecurityException) {
+            Log.i("StratusBackup", "the original of $uri was refused, sending it without its location", e)
+            null
+        } catch (e: UnsupportedOperationException) {
+            Log.i("StratusBackup", "the original of $uri was refused, sending it without its location", e)
+            null
+        }
+    }
+
+    /**
      * What to ask for so that [access] can answer [MediaAccess.Full], kept
      * beside it so the two cannot disagree about which permission means what.
      */
     fun permissions(): Array<String> = when {
-        Build.VERSION.SDK_INT < 33 -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        Build.VERSION.SDK_INT < 33 -> arrayOf(
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.ACCESS_MEDIA_LOCATION,
+        )
         // Asking for the selected-photos one too is what lets Android 14 offer
         // "a selection" instead of only all or nothing; without it the choice
         // is taken away rather than defaulting to everything.
@@ -122,9 +150,25 @@ class AndroidAssetSource(private val context: Context) : AssetSource {
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO,
             READ_MEDIA_VISUAL_USER_SELECTED,
+            Manifest.permission.ACCESS_MEDIA_LOCATION,
         )
-        else -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        else -> arrayOf(
+            Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VIDEO,
+            Manifest.permission.ACCESS_MEDIA_LOCATION,
+        )
     }
+
+    /**
+     * Whether the library was granted whole and its locations were not, which
+     * is every install from before stratus-app#228: the request that grants
+     * the library is the only one that ever asked, and it is not asked again.
+     * Android grants this one without a dialog once the library is granted, so
+     * asking costs nobody a tap. Not with a selection, where asking for
+     * anything in the group opens the picker again.
+     */
+    suspend fun lacksLocations(): Boolean =
+        access() == MediaAccess.Full && !has(Manifest.permission.ACCESS_MEDIA_LOCATION)
 
     private fun has(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED

@@ -38,6 +38,7 @@ class BackgroundTusTransport(
         target: UploadTarget,
         resume: Resume?,
         body: UploadBody,
+        begun: suspend (Resume) -> Unit,
     ): UploadOutcome {
         // Where the server is, asked rather than assumed -- the same rule the
         // in-process transport follows, and for the same reason: a client can
@@ -96,6 +97,7 @@ class BackgroundPutTransport(
         target: UploadTarget,
         resume: Resume?,
         body: UploadBody,
+        begun: suspend (Resume) -> Unit,
     ): UploadOutcome {
         val url = baseUrl.trimEnd('/') + "/" + target.path.trimStart('/')
         val request = NSMutableURLRequest.requestWithURL(NSURL(string = url)).apply {

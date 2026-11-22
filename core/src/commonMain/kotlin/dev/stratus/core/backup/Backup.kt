@@ -79,7 +79,9 @@ class Backup(
     private val network: Network = Network { false },
 ) {
     /** What to say about the backup, assembled from what the queue actually holds. */
-    val status: BackupStatus by lazy { BackupStatus(database, assets, parked = ::parked) }
+    val status: BackupStatus by lazy {
+        BackupStatus(database, assets, parked = ::parked, passing = { guard.withLock { passing } })
+    }
 
     /** The server a pass is owed to, if there is one and it has sources. */
     suspend fun enabled(): Server? = instances.instance()?.takeIf { it.backupEnabled }

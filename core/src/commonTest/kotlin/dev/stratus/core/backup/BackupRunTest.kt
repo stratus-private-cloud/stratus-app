@@ -12,6 +12,8 @@ import kotlinx.io.Buffer
 import kotlinx.io.RawSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 private class RollOf(
@@ -43,7 +45,12 @@ private class Collected : LogSink {
 
 private class Always(private val outcome: UploadOutcome) : Transport {
     override val resumable = false
-    override suspend fun send(target: UploadTarget, resume: Resume?, body: UploadBody): UploadOutcome = outcome
+    override suspend fun send(
+        target: UploadTarget,
+        resume: Resume?,
+        body: UploadBody,
+        begun: suspend (Resume) -> Unit,
+    ): UploadOutcome = outcome
 }
 
 class BackupRunTest {
@@ -64,6 +71,7 @@ class BackupRunTest {
         sink: LogSink = Collected(),
         metered: Boolean = false,
         directories: DirectoryMaker = DirectoryMaker { },
+        transport: Transport = Always(outcome),
     ): BackupRun {
         database.migrate()
         return BackupRun(
@@ -77,7 +85,7 @@ class BackupRunTest {
                         pending = database.pending(),
                         cache = cache,
                         source = roll,
-                        transport = Always(outcome),
+                        transport = transport,
                         directories = directories,
                     ),
                     index = BackupIndex(layout, cache, DavClient(HttpClient(engine), "https://host/dav/")),
@@ -98,6 +106,29 @@ class BackupRunTest {
         assertEquals(2, report.queued)
         assertEquals(2, report.uploaded)
         assertEquals(StoppedBecause.NothingLeft, report.stopped)
+    }
+
+    @Test
+    fun aPassTheSystemStopsSaysItHasEnded() = runTest {
+        // A cancellation reaches none of the returns, and a journal left
+        // running was a screen saying "Working" until some later pass ended
+        // (stratus-app#230).
+        val stopped = object : Transport {
+            override val resumable = false
+            override suspend fun send(
+                target: UploadTarget,
+                resume: Resume?,
+                body: UploadBody,
+                begun: suspend (Resume) -> Unit,
+            ): UploadOutcome = throw kotlinx.coroutines.CancellationException("Job was cancelled")
+        }
+        val run = run(RollOf(listOf(asset(1))), transport = stopped)
+
+        assertFailsWith<kotlinx.coroutines.CancellationException> { run.once(instance) }
+
+        val journal = database.journal().read()!!
+        assertFalse(journal.running, "was $journal")
+        assertEquals(StoppedBecause.AskedTo, journal.outcome)
     }
 
     @Test

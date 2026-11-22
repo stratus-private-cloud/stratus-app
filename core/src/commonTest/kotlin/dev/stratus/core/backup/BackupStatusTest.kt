@@ -21,8 +21,8 @@ class BackupStatusTest {
     private val database = BackupDatabase(BundledSQLiteDriver().open(":memory:"))
     private var clock = 1_000_000L
 
-    private fun status(access: MediaAccess = MediaAccess.Full, parked: Boolean = false) =
-        BackupStatus(database, Roll(access), now = { clock }, parked = { parked })
+    private fun status(access: MediaAccess = MediaAccess.Full, parked: Boolean = false, passing: Boolean = true) =
+        BackupStatus(database, Roll(access), now = { clock }, parked = { parked }, passing = { passing })
 
     private suspend fun queue(path: String, size: Long = 100) {
         database.migrate()
@@ -92,6 +92,16 @@ class BackupStatusTest {
         assertTrue(state is BackupState.Working, "was $state")
         assertEquals("/Photos/2026/09/a.heic", state.current)
         assertEquals(1, state.left)
+    }
+
+    @Test
+    fun aPassThatDiedWithItsProcessIsNotStillWorking() = runTest {
+        // A process killed mid-pass never writes that it ended (stratus-app#230).
+        queue(path = "/a.heic")
+        database.journal().began(clock)
+
+        val state = status(passing = false).of()
+        assertTrue(state is BackupState.Waiting, "was $state")
     }
 
     @Test

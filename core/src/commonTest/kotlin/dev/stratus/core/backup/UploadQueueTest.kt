@@ -27,7 +27,12 @@ private class FakeTransport(
     private val answers: MutableList<UploadOutcome>,
 ) : Transport {
     val sent = mutableListOf<Pair<UploadTarget, Resume?>>()
-    override suspend fun send(target: UploadTarget, resume: Resume?, body: UploadBody): UploadOutcome {
+    override suspend fun send(
+        target: UploadTarget,
+        resume: Resume?,
+        body: UploadBody,
+        begun: suspend (Resume) -> Unit,
+    ): UploadOutcome {
         sent += target to resume
         body.open(resume?.offset ?: 0)
         return if (answers.size > 1) answers.removeFirst() else answers.first()
@@ -373,14 +378,46 @@ class UploadQueueTest {
         assertEquals(Resume("upload-1", 0), transport.sent[1].second)
     }
 
+    @Test
+    fun aTransferStoppedByTheSystemLeavesItsHandleForTheNextPass() = runTest {
+        val stopped = object : Transport {
+            override val resumable = true
+            val asked = mutableListOf<Resume?>()
+            override suspend fun send(
+                target: UploadTarget,
+                resume: Resume?,
+                body: UploadBody,
+                begun: suspend (Resume) -> Unit,
+            ): UploadOutcome {
+                asked += resume
+                if (resume == null) {
+                    begun(Resume("http://host/tus/abc", 0))
+                    throw kotlinx.coroutines.CancellationException("Job was cancelled")
+                }
+                return UploadOutcome.Done("etag")
+            }
+        }
+        val queue = queue(stopped)
+        queue.enqueue(listOf(asset(5)))
+
+        assertFailsWith<kotlinx.coroutines.CancellationException> { queue.runNext() }
+        queue.runNext()
+
+        assertEquals(listOf(null, Resume("http://host/tus/abc", 0)), stopped.asked)
+    }
+
     // stratus-app#83: Android stopping the worker is not the server refusing
     // the file, and must not be written down as if it were.
     @Test
     fun aPassStoppedByTheSystemLeavesTheUploadPendingWithNoFailure() = runTest {
         val stopped = object : Transport {
             override val resumable = false
-            override suspend fun send(target: UploadTarget, resume: Resume?, body: UploadBody) =
-                throw kotlinx.coroutines.CancellationException("Job was cancelled")
+            override suspend fun send(
+                target: UploadTarget,
+                resume: Resume?,
+                body: UploadBody,
+                begun: suspend (Resume) -> Unit,
+            ) = throw kotlinx.coroutines.CancellationException("Job was cancelled")
         }
         val queue = queue(stopped)
         queue.enqueue(listOf(asset(5)))

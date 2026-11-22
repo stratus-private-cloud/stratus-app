@@ -16,6 +16,12 @@ class BackupStatus(
     private val now: () -> Long = { getTimeMillis() },
     /** Whether sending is stopped for wifi right now (stratus-app#133). */
     private val parked: suspend () -> Boolean = { false },
+    /**
+     * Whether a pass is running in this process, which the journal alone
+     * cannot say: a process killed mid-pass never writes that it ended, and
+     * its journal said "Working" until some later pass did (stratus-app#230).
+     */
+    private val passing: suspend () -> Boolean = { true },
 ) {
     suspend fun of(): BackupState {
 
@@ -29,7 +35,7 @@ class BackupStatus(
         val summary = pending.summary(now())
         val journal = database.journal().read()
 
-        if (journal?.running == true) {
+        if (journal?.running == true && passing()) {
             return BackupState.Working(summary.total, journal.currentPath)
         }
 

@@ -21,6 +21,7 @@ import dev.stratus.core.net.PinnedHostnameVerifier
 import dev.stratus.core.net.PinningTrustManager
 import dev.stratus.core.net.pinnedSocketFactory
 import dev.stratus.core.share.AndroidLinkSharing
+import dev.stratus.core.store.CachedSecureStore
 import dev.stratus.core.store.AndroidSecureStore
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
@@ -76,7 +77,7 @@ private fun build(application: Context): AppContainer {
                 }
             }
         },
-        secure = AndroidSecureStore(application),
+        secure = CachedSecureStore(AndroidSecureStore(application)),
         handoff = AndroidFileHandoff(application),
         sharing = AndroidLinkSharing(application),
         caster = Casters(

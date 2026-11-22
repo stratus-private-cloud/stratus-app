@@ -10,6 +10,8 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Secrets under a key that never leaves the secure hardware.
@@ -33,7 +35,10 @@ class AndroidSecureStore(context: Context) : SecureStore {
 
     private val preferences = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
-    override suspend fun read(key: String): String? =
+    // On IO, all three: the Keystore is a call into another process and its
+    // first use loads the key store from disk, which is not a thing to do on
+    // whatever thread a screen asked from (stratus-app#236).
+    override suspend fun read(key: String): String? = withContext(Dispatchers.IO) {
         try {
             preferences.getString(key, null)?.let(::decrypt)
         } catch (_: GeneralSecurityException) {
@@ -43,12 +48,13 @@ class AndroidSecureStore(context: Context) : SecureStore {
             preferences.edit().clear().apply()
             null
         }
+    }
 
-    override suspend fun write(key: String, value: String) {
+    override suspend fun write(key: String, value: String) = withContext(Dispatchers.IO) {
         preferences.edit().putString(key, encrypt(value)).apply()
     }
 
-    override suspend fun delete(key: String) {
+    override suspend fun delete(key: String) = withContext(Dispatchers.IO) {
         preferences.edit().remove(key).apply()
     }
 

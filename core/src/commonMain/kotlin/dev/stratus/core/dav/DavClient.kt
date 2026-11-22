@@ -1,5 +1,7 @@
 package dev.stratus.core.dav
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareGet
@@ -71,7 +73,8 @@ class DavClient(
             setBody(MultiStatus.infoBody())
         }
         if (response.status.value == 207 || response.status.value == 200) {
-            return MultiStatus.parseInfo(response.bodyAsText())
+            val body = response.bodyAsText()
+            return withContext(Dispatchers.Default) { MultiStatus.parseInfo(body) }
         }
         throw response.toError(path)
     }
@@ -87,7 +90,10 @@ class DavClient(
         // carrying a multistatus is tolerated because some servers do that and
         // the body is the part that matters.
         if (response.status.value == 207 || response.status.value == 200) {
-            return MultiStatus.parse(response.bodyAsText(), basePath)
+            // Parsed off the caller's thread: a listing of ten thousand files is
+            // megabytes of XML, and the caller is usually a screen (stratus-app#236).
+            val body = response.bodyAsText()
+            return withContext(Dispatchers.Default) { MultiStatus.parse(body, basePath) }
         }
         throw response.toError(path)
     }
@@ -148,7 +154,8 @@ class DavClient(
             setBody(MultiStatus.searchBody(scope, text, limit))
         }
         if (response.status.value == 207 || response.status.value == 200) {
-            return MultiStatus.parseSearch(response.bodyAsText(), basePath)
+            val body = response.bodyAsText()
+            return withContext(Dispatchers.Default) { MultiStatus.parseSearch(body, basePath) }
         }
         // 405 is a server that does not have the method at all, which is most
         // of them. It is not an error to report as one: the caller asked a

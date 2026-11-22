@@ -23,6 +23,7 @@ import dev.stratus.core.cast.dlna.DlnaCaster
 import dev.stratus.core.cast.dlna.DlnaControl
 import dev.stratus.core.share.IosLinkSharing
 import dev.stratus.core.store.KeychainSecureStore
+import dev.stratus.core.store.CachedSecureStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -88,7 +89,7 @@ fun appContainer(): AppContainer = plain
 fun hostAppContainer(): AppContainer = hosting
 
 private fun build(registersDomains: Boolean): AppContainer {
-    val secure = KeychainSecureStore(accessGroup = sharedKeychainGroup())
+    val secure = CachedSecureStore(KeychainSecureStore(accessGroup = sharedKeychainGroup()))
     // Built before the container because the container's transports close over
     // it, and because there is exactly one session per process.
     lateinit var holder: AppContainer

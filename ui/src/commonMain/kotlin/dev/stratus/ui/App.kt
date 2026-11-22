@@ -500,7 +500,9 @@ private suspend fun pictureOf(container: AppContainer, entry: DavResource): Imag
         !entry.isDirectory && depth(entry.path, Part.Videos.floor) == 3 -> container.thumbnails.of(entry, TILE_PIXELS)
         else -> return null
     }
-    return (answer as? Thumbnail.Picture)?.let { decodePicture(it.bytes) }
+    // Decoded off the main thread, which is where a tile asks from: a grid
+    // binds dozens at once (stratus-app#236).
+    return (answer as? Thumbnail.Picture)?.let { withContext(Dispatchers.Default) { decodePicture(it.bytes) } }
 }
 
 // 300 and not a pixel more: a Stratus rounds up to 96, 300 or 1200 and makes

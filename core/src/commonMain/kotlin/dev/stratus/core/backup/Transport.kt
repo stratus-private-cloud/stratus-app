@@ -1,5 +1,7 @@
 package dev.stratus.core.backup
 
+import dev.stratus.core.dav.DavClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.io.RawSource
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -206,4 +208,26 @@ data class HandOverBudget(val files: Int, val bytes: Long) {
         /** Eight files and half a gigabyte: a few minutes of work for the system, and a tmp it can spare. */
         val Ios = HandOverBudget(files = 8, bytes = 512L * 1024 * 1024)
     }
+}
+
+/**
+ * [target] as done, with its ETag, when the server already holds it whole --
+ * for a transport about to hand a file to the system (stratus-app#234).
+ *
+ * iOS can lose the answer to a transfer that finished: the session reports it
+ * only once it exists, and a pass that reconciled first had already put the row
+ * back in the queue. Sent again, that was a whole photograph uploaded twice. The
+ * remote path is a function of the photograph -- its time, name and size -- so a
+ * file there of the same size is the same photograph, and asking costs one
+ * small request against a transfer that was going to happen anyway.
+ *
+ * Null for anything else, a failure to ask included: then it is sent, which is
+ * what would have happened without asking.
+ */
+suspend fun alreadyThere(dav: DavClient, target: UploadTarget): UploadOutcome.Done? = try {
+    dav.stat(target.path).takeIf { !it.isDirectory && it.size == target.size }?.let { UploadOutcome.Done(it.etag) }
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Exception) {
+    null
 }

@@ -88,6 +88,17 @@ class BackgroundUploads(
         )
     }
 
+    /**
+     * Makes the session now rather than when a pass first needs it, which is
+     * what the system's relaunch to report wants: the finished transfers are
+     * reported to a session that exists, and the sooner it does the less a
+     * pass can reconcile away before their answers arrive (stratus-app#234).
+     * Lazy otherwise, so that [allowsCellular] is the server's by then.
+     */
+    fun connect() {
+        session
+    }
+
     /** Called once the system has finished reporting, so Swift can let go. */
     var onEventsDelivered: (() -> Unit)? = null
 

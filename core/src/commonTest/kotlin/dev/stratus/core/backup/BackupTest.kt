@@ -11,6 +11,8 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.Buffer
 import kotlinx.io.RawSource
@@ -34,6 +36,16 @@ private class OnePhoto : AssetSource {
         Buffer().apply { write(byteArrayOf(1, 2, 3)) }
 }
 
+/** A camera roll a test can add to while a pass is running. */
+private class GrowingRoll : AssetSource {
+    val photos = mutableListOf(Asset("l-1", 1_600_000_000_000, originalName = "IMG_1.jpg", sizeBytes = 3))
+    override suspend fun access() = MediaAccess.Full
+    override suspend fun sources() = listOf(MediaSource("camera", "Camera", photos.size))
+    override suspend fun assets(from: Set<String>, addedAfterEpochMs: Long) = photos.toList()
+    override suspend fun open(localId: String, part: AssetPart, from: Long): RawSource =
+        Buffer().apply { write(byteArrayOf(1, 2, 3)) }
+}
+
 class BackupTest {
 
     private val store = MemoryStore()
@@ -47,11 +59,21 @@ class BackupTest {
     /** Hosts that answer everything with an error, for the one that is down. */
     private val broken = mutableSetOf<String>()
 
+    /** Completed when the first PUT arrives. */
+    private val reached = CompletableDeferred<Unit>()
+
+    /** What every PUT waits for, when a test wants one held mid-flight. */
+    private var held: CompletableDeferred<Unit>? = null
+
     private val connections = Connections { instance ->
         val engine = MockEngine { request ->
             val host = request.url.host
             val method = request.method.value
             seen += host to method
+            if (method == "PUT") {
+                reached.complete(Unit)
+                held?.await()
+            }
             when {
                 host in broken -> respond("", HttpStatusCode.InternalServerError)
                 method == "OPTIONS" && host in speaksTus ->
@@ -158,6 +180,64 @@ class BackupTest {
         backup.pass()
 
         assertTrue("PUT" in methodsAt("second"), "was ${methodsAt("second")}")
+    }
+
+    @Test
+    fun aSecondPassWhileOneRunsSendsNothing() = runTest {
+        // The four unique works on Android, or a tap beside the system's task
+        // on iOS (stratus-app#229): both took the head of the queue and sent it.
+        signedIn("busy")
+        held = CompletableDeferred()
+        val first = async { backup.pass() }
+        reached.await()
+
+        assertEquals(PassOutcome.Finished, backup.pass())
+        held!!.complete(Unit)
+        first.await()
+
+        assertEquals(1, methodsAt("busy").count { it == "PUT" }, "was ${methodsAt("busy")}")
+    }
+
+    @Test
+    fun aPassAskedForDuringOneIsRunByItWhenItIsDone() = runTest {
+        // Dropping the second would be stratus-app#188 again: the pass running
+        // had already looked at the roll, so the photograph just taken -- the
+        // reason anybody taps -- would wait for the next one.
+        val roll = GrowingRoll()
+        val backup = Backup(instances, database, roll, connections)
+        signedIn("busy")
+        held = CompletableDeferred()
+        val first = async { backup.pass() }
+        reached.await()
+
+        roll.photos += Asset("l-2", 1_600_000_100_000, originalName = "IMG_2.jpg", sizeBytes = 3)
+        backup.pass()
+        held!!.complete(Unit)
+        first.await()
+
+        assertEquals(2, methodsAt("busy").count { it == "PUT" }, "was ${methodsAt("busy")}")
+    }
+
+    @Test
+    fun aPassToldToStopDoesNotGoRoundAgain() = runTest {
+        val roll = GrowingRoll()
+        val backup = Backup(instances, database, roll, connections)
+        signedIn("busy")
+        held = CompletableDeferred()
+        var going = true
+        val first = async { backup.pass(keepGoing = { going }) }
+        reached.await()
+
+        roll.photos += Asset("l-2", 1_600_000_100_000, originalName = "IMG_2.jpg", sizeBytes = 3)
+        backup.pass()
+        going = false
+        held!!.complete(Unit)
+        first.await()
+
+        assertEquals(1, methodsAt("busy").count { it == "PUT" }, "was ${methodsAt("busy")}")
+        // And the next one is not refused as if the stopped one were still running.
+        backup.pass()
+        assertEquals(2, methodsAt("busy").count { it == "PUT" }, "was ${methodsAt("busy")}")
     }
 
     @Test

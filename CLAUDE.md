@@ -1159,7 +1159,12 @@ no test can watch it. So it decides nothing, and all of this lives in
 - **Newest photograph first.** The picture somebody just took is the one they
   check for; a first backup that starts in 2014 looks broken for days.
 - **One upload at a time.** On a phone, several at once drains the battery and
-  saturates the uplink without finishing any sooner.
+  saturates the uplink without finishing any sooner. **And one pass at a time**
+  (stratus-app#229), which `Backup.pass` holds rather than any scheduler:
+  Android runs its unique works side by side and iOS a tap beside the
+  system's task, and two passes took the same head of the queue and sent it
+  twice. One asked for meanwhile is not dropped -- the pass running goes round
+  once more when it is done, since that is what a tap was asking for.
 - **Waiting helps or it does not, and that is not a retry count.** Rejected
   credentials do not improve by being asked again, and asking again is another
   failed login on a server that counts them; a timeout does improve. A permanent

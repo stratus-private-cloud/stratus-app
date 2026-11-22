@@ -4,6 +4,10 @@ import dev.stratus.core.dav.DavClient
 import dev.stratus.core.server.Server
 import dev.stratus.core.server.ServerStore
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** An instance, reached: both clients, because tus is negotiated off the raw one. */
 class Connection(val http: HttpClient, val dav: DavClient)
@@ -93,6 +97,48 @@ class Backup(
         keepGoing: () -> Boolean = { true },
         onStep: (QueueStep) -> Unit = {},
     ): PassOutcome {
+        // One at a time, whoever asks (stratus-app#229). Android runs its four
+        // unique works side by side and iOS a tap beside the system's task, and
+        // two passes take the same head of the queue and send it twice. The one
+        // that arrives second is not dropped, though: the pass running looks at
+        // the camera roll again when it is done, which is what a tap for the
+        // photograph just taken was asking for (stratus-app#188).
+        val first = guard.withLock {
+            if (passing) {
+                again = true
+                false
+            } else {
+                passing = true
+                true
+            }
+        }
+        if (!first) return PassOutcome.Finished
+
+        var released = false
+        try {
+            while (true) {
+                val outcome = onePass(keepGoing, onStep)
+                val more = guard.withLock {
+                    val more = again && outcome == PassOutcome.Finished && keepGoing()
+                    again = false
+                    if (!more) passing = false
+                    more
+                }
+                if (!more) {
+                    released = true
+                    return outcome
+                }
+            }
+        } finally {
+            if (!released) withContext(NonCancellable) { guard.withLock { passing = false; again = false } }
+        }
+    }
+
+    private val guard = Mutex()
+    private var passing = false
+    private var again = false
+
+    private suspend fun onePass(keepGoing: () -> Boolean, onStep: (QueueStep) -> Unit): PassOutcome {
         liveTransfers?.let { live -> reconcile(live()) }
         val instance = enabled() ?: return PassOutcome.Finished
         if (!keepGoing()) return PassOutcome.Finished

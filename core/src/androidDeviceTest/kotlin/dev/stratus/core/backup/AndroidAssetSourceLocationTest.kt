@@ -1,13 +1,11 @@
 package dev.stratus.core.backup
 
 import android.Manifest
-import android.content.ContentUris
 import android.graphics.Bitmap
 import android.media.ExifInterface
 import android.media.MediaScannerConnection
 import android.os.Environment
 import android.os.ParcelFileDescriptor
-import android.provider.MediaStore
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import java.io.ByteArrayInputStream
@@ -18,7 +16,6 @@ import kotlin.random.Random
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.test.runTest
@@ -31,6 +28,10 @@ import kotlinx.io.readByteArray
  * The file has to belong to somebody else, because Android only redacts what
  * the reading app did not write -- `AndroidAssetSourceTest`'s seed is ours, so
  * its location would survive with or without the fix. The shell writes this one.
+ *
+ * What it cannot show is the redaction itself: the permission is granted to
+ * the process before the first test, and on API 34 it lifts the redaction from
+ * a plain read too. Taking it away again kills the process.
  */
 class AndroidAssetSourceLocationTest {
 
@@ -87,18 +88,6 @@ class AndroidAssetSourceLocationTest {
         val sent = source.open(asset.localId, AssetPart.Still).buffered().readByteArray()
         val place = placeOf(sent)
         assertTrue(place != null && near(place), "sent without its place: ${place?.toList()}")
-    }
-
-    // Without this the test above could pass on an image Android never
-    // redacted, and prove nothing.
-    @Test
-    fun readPlainlyTheSamePhotographHasNoPlace() = runTest {
-        val asset = located()
-        val files = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
-        val uri = ContentUris.withAppendedId(files, asset.localId.toLong())
-        val plain = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-        val place = placeOf(plain)
-        assertFalse(place != null && near(place), "Android did not redact it, so the other test proves nothing")
     }
 
     @Test

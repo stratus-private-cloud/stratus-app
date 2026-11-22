@@ -406,6 +406,14 @@ class UploadQueueTest {
         assertEquals(listOf(null, Resume("http://host/tus/abc", 0)), stopped.asked)
     }
 
+    @Test
+    fun whatIsQueuedAgainIsNotCountedAgain() = runTest {
+        // stratus-app#240: the log's "queued" counted rows already waiting.
+        val queue = queue()
+        assertEquals(2, queue.enqueue(listOf(asset(1), asset(2))))
+        assertEquals(1, queue.enqueue(listOf(asset(1), asset(2), asset(3))))
+    }
+
     // stratus-app#83: Android stopping the worker is not the server refusing
     // the file, and must not be written down as if it were.
     @Test

@@ -33,3 +33,4 @@ iosApp/*.xcodeproj/
 
 # Local toolchain settings, per machine
 .env
+hs_err_pid*.log

@@ -20,6 +20,11 @@ import kotlinx.coroutines.withContext
  * so a photograph that failed holds the bound behind it until somebody deals
  * with it. And it never moves at all while any photograph came back without an
  * added date, which is every iOS below 26.
+ *
+ * A pass asks for a day before it, not from it (stratus-app#231): something
+ * can appear after the mark has passed its arrival, and only something that
+ * takes longer than a day to appear is still missed -- a photograph restored
+ * from the system's trash a week after it was deleted, unsent, is one.
  */
 class BackupMark(
     private val connection: SQLiteConnection,

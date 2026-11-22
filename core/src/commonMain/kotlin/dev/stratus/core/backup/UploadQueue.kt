@@ -16,7 +16,8 @@ fun interface DirectoryMaker {
 /** What one turn of the queue did. */
 sealed interface QueueStep {
     data object Idle : QueueStep
-    data class Uploaded(val path: String) : QueueStep
+    /** [byHand] is a file picked by hand rather than the camera roll, for whoever says which (stratus-app#258). */
+    data class Uploaded(val path: String, val byHand: Boolean = false) : QueueStep
     data class Progressed(val path: String, val offset: Long) : QueueStep
 
     /** Given to the platform; the answer arrives through [UploadQueue.settle]. */
@@ -206,13 +207,14 @@ class UploadQueue(
     suspend fun reconcile(live: Set<String>): Int = records.reconcile(live)
 
     /** What is outstanding, counted. */
-    suspend fun summary(): PendingSummary = pending.summary(now())
+    suspend fun summary(origin: Origin? = null): PendingSummary = pending.summary(now(), origin)
 
     /** Everything outstanding. Unbounded, so not for anything asked repeatedly. */
-    suspend fun outstanding(): List<PendingUpload> = pending.all()
+    suspend fun outstanding(origin: Origin? = null): List<PendingUpload> =
+        if (origin == null) pending.all() else pending.all(origin)
 
     /** How much is left, counted rather than read. */
-    suspend fun left(): Int = summary().total
+    suspend fun left(origin: Origin? = null): Int = summary(origin).total
 
     /** One upload's bytes, either way a transport can take them, from wherever its row says they are. */
     private fun bodyOf(upload: PendingUpload): UploadBody = when (upload.origin) {

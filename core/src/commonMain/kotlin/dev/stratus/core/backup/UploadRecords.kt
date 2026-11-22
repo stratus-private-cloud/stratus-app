@@ -71,7 +71,7 @@ class UploadRecords(
                     picked?.forget(upload.localId)
                     arrived()
                 }
-                QueueStep.Uploaded(upload.path)
+                QueueStep.Uploaded(upload.path, byHand = upload.origin == Origin.Picked)
             }
 
             is UploadOutcome.Taken -> taken(upload)

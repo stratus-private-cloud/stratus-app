@@ -144,7 +144,7 @@ class BackupRun(
             // Seen against queued is the whole diagnosis: a pass that enumerates
             // forty photographs and queues none of them is working, and one that
             // queues the same forty every time is sending them again.
-            if (log.on) log.say("pass began: ${assets.size} seen, ${report.queued} queued, ${queue.left()} to send")
+            if (log.on) log.say("pass began: ${assets.size} seen, ${report.queued} queued, ${queue.left(Origin.Library)} to send")
 
             while (keepGoing()) {
                 // After enqueuing and not before it, deliberately: looking at
@@ -170,7 +170,11 @@ class BackupRun(
                     narrateEnd(log, parked, queue)
                     return parked
                 }
-                val step = queue.runNext()
+                // The camera roll's rows only: a file picked by hand is sent by
+                // the pass before this one starts, and counted there, or the
+                // backup's "sent" and its current file named a document
+                // somebody uploaded (stratus-app#258).
+                val step = queue.runNext(Origin.Library)
                 onStep(step)
                 narrate(log, step, queue)
                 report = when (step) {
@@ -229,7 +233,7 @@ class BackupRun(
      */
     private suspend fun narrate(log: BackupLog, step: QueueStep, queue: UploadQueue) {
         if (!log.on) return
-        val left = queue.left()
+        val left = queue.left(Origin.Library)
         log.say(
             when (step) {
                 is QueueStep.Idle -> return
@@ -248,7 +252,7 @@ class BackupRun(
         if (!log.on) return
         log.summarise(
             "pass ended ${report.stopped}: ${report.uploaded} sent, " +
-                "${report.failed} failed, ${queue.left()} left",
+                "${report.failed} failed, ${queue.left(Origin.Library)} left",
         )
     }
 
@@ -279,7 +283,7 @@ class BackupRun(
 
     private suspend fun advance(mark: BackupMark, queue: UploadQueue, assets: List<Asset>) {
         if (assets.isEmpty() || assets.any { it.addedAtEpochMs <= 0 }) return
-        val owed = queue.outstanding().mapTo(mutableSetOf()) { it.localId }
+        val owed = queue.outstanding(Origin.Library).mapTo(mutableSetOf()) { it.localId }
         val oldestOwed = assets.filter { it.localId in owed }.minOfOrNull { it.addedAtEpochMs }
         mark.advanceTo(oldestOwed?.minus(1) ?: assets.maxOf { it.addedAtEpochMs })
     }
@@ -290,7 +294,7 @@ class BackupRun(
      * "finished" over it would be lying.
      */
     private suspend fun stoppedFrom(queue: UploadQueue): StoppedBecause {
-        val left = queue.summary()
+        val left = queue.summary(Origin.Library)
         return when {
             left.total == 0 -> StoppedBecause.NothingLeft
             // Asked in this order because a pass can end with both, and what

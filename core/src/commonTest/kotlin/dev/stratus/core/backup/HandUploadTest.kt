@@ -109,7 +109,8 @@ class HandUploadTest {
         val queue = queue(transport)
         pick(scan)
 
-        assertEquals(QueueStep.Uploaded("files/docs/scan.pdf"), queue.runNext())
+        // Said to be one picked by hand, which is what the notification names (stratus-app#258).
+        assertEquals(QueueStep.Uploaded("files/docs/scan.pdf", byHand = true), queue.runNext())
         assertEquals("files/docs/scan.pdf", transport.sent.single().first.path)
         assertEquals(listOf("content://scan" to 0L), picks.opened)
         // Settled like a photograph: one table, one rule.
@@ -132,6 +133,22 @@ class HandUploadTest {
     }
 
     @Test
+    fun theBackupsHalfOfAPassLeavesWhatWasPickedAlone() = runTest {
+        // stratus-app#258: a hand upload sent by the backup's loop was counted
+        // in its "sent" and shown as its current file.
+        val transport = ScriptedTransport(false, mutableListOf(UploadOutcome.Done(null)))
+        val queue = queue(transport)
+        queue.enqueue(listOf(Asset("l-1", utcMillis(2026, 10, 1, 12, 0, 0), originalName = "IMG_1.jpg", sizeBytes = 3)))
+        pick(scan)
+
+        val step = queue.runNext(Origin.Library)
+
+        assertTrue(step is QueueStep.Uploaded && !step.byHand, "was $step")
+        assertEquals(1, queue.left(Origin.Picked))
+        assertEquals(0, queue.left(Origin.Library))
+    }
+
+    @Test
     fun aNameTakenOnTheServerLandsBesideItOverPut() = runTest {
         val transport = ScriptedTransport(false, mutableListOf(UploadOutcome.Taken, UploadOutcome.Done(null)))
         val queue = queue(transport)
@@ -139,7 +156,7 @@ class HandUploadTest {
 
         val first = queue.runNext()
         assertTrue(first is QueueStep.Retrying && first.inMillis == 0L, "was $first")
-        assertEquals(QueueStep.Uploaded("files/docs/scan (2).pdf"), queue.runNext())
+        assertEquals(QueueStep.Uploaded("files/docs/scan (2).pdf", byHand = true), queue.runNext())
 
         assertEquals(listOf("files/docs/scan.pdf", "files/docs/scan (2).pdf"), transport.sent.map { it.first.path })
         assertTrue(transport.sent.all { it.first.exclusive }, "a PUT that may replace was sent")
@@ -154,7 +171,7 @@ class HandUploadTest {
         val queue = queue(transport)
         pick(scan)
 
-        assertEquals(QueueStep.Uploaded("files/docs/scan (2).pdf"), queue.runNext())
+        assertEquals(QueueStep.Uploaded("files/docs/scan (2).pdf", byHand = true), queue.runNext())
         assertEquals(listOf("files/docs/scan.pdf", "files/docs/scan (2).pdf"), asked)
         assertFalse(transport.sent.single().first.exclusive)
     }
@@ -175,7 +192,7 @@ class HandUploadTest {
         // Whatever the folder holds now, the upload already has its name.
         occupied = { true }
         asked.clear()
-        assertEquals(QueueStep.Uploaded("files/docs/scan.pdf"), queue.runNext())
+        assertEquals(QueueStep.Uploaded("files/docs/scan.pdf", byHand = true), queue.runNext())
         assertEquals(emptyList(), asked)
         assertEquals(Resume("http://host/tus/1", 4), transport.sent.last().second)
         assertEquals("content://scan" to 4L, picks.opened.last())

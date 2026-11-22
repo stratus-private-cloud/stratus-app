@@ -74,6 +74,7 @@ class BackupRunTest {
         metered: Boolean = false,
         directories: DirectoryMaker = DirectoryMaker { },
         transport: Transport = Always(outcome),
+        network: Network = Network { metered },
     ): BackupRun {
         database.migrate()
         return BackupRun(
@@ -96,7 +97,7 @@ class BackupRunTest {
             },
             journalFor = { database.journal() },
             logFor = { BackupLog(it.baseUrl, sink) },
-            network = Network { metered },
+            network = network,
         )
     }
 
@@ -287,11 +288,57 @@ class BackupRunTest {
         // saying nothing is waiting while the camera roll fills up, and
         // looking at the camera roll costs no data at all.
         val roll = RollOf(listOf(asset(1), asset(2)))
-        val report = run(roll, metered = true).once(instance)
+        val run = run(roll, metered = true)
+        // A phone that has settled something, so there is no walk to make.
+        database.cache().add(listOf("/elsewhere/x.jpg"))
+        val report = run.once(instance)
 
         assertEquals(StoppedBecause.WaitingForWifi, report.stopped)
         assertEquals(2, report.queued)
         assertEquals(0, report.uploaded)
+    }
+
+    @Test
+    fun aColdStartOnMobileDataDoesNotWalkTheServer() = runTest {
+        // stratus-app#235: the walk is a listing per month, megabytes for a
+        // large camera roll, and it ran before the connection was asked about.
+        val asked = mutableListOf<String>()
+        val engine = MockEngine { request ->
+            asked += request.method.value
+            respond("", HttpStatusCode.NotFound)
+        }
+        val report = run(RollOf(listOf(asset(1), asset(2))), engine = engine, metered = true).once(instance)
+
+        assertEquals(StoppedBecause.WaitingForWifi, report.stopped)
+        assertEquals(emptyList(), asked, "the server was asked over mobile data")
+        assertEquals(0, report.queued)
+    }
+
+    @Test
+    fun wifiLostHalfwayParksThePass() = runTest {
+        // stratus-app#235: asked once a pass, a pass that began on wifi sent
+        // the rest of the queue over mobile data when it left.
+        var metered = false
+        val sent = mutableListOf<String>()
+        val transport = object : Transport {
+            override val resumable = false
+            override suspend fun send(
+                target: UploadTarget,
+                resume: Resume?,
+                body: UploadBody,
+                begun: suspend (Resume) -> Unit,
+            ): UploadOutcome {
+                sent += target.path
+                metered = true
+                return UploadOutcome.Done("etag")
+            }
+        }
+        val run = run(RollOf(listOf(asset(1), asset(2), asset(3))), transport = transport, network = Network { metered })
+        val report = run.once(instance)
+
+        assertEquals(StoppedBecause.WaitingForWifi, report.stopped)
+        assertEquals(1, sent.size, "sent $sent")
+        assertEquals(1, report.uploaded)
     }
 
     @Test

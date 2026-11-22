@@ -30,7 +30,10 @@ class BackupIndex(
      * over somebody's mobile data.
      */
     suspend fun warmUp(assets: List<Asset>): Int? =
-        if (cache.isEmpty()) walk(assets) else null
+        if (cold()) walk(assets) else null
+
+    /** Whether [warmUp] would walk, which costs a listing per month. */
+    suspend fun cold(): Boolean = cache.isEmpty()
 
     /**
      * Asks the server what it holds, settles all of it, and answers how much.

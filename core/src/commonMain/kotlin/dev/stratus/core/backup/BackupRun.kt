@@ -109,6 +109,19 @@ class BackupRun(
             // settled record's answer (stratus-app#124).
             val assets = source.assets(instance.sources, lookingBackFrom(prepared.mark.read()))
 
+            // On a connection somebody pays for, a cold start parks before it
+            // walks (stratus-app#235): asking what the server holds is a
+            // listing per month the camera roll touches, megabytes for a large
+            // one, and the setting is about the data and not only the uploads.
+            // Nothing is queued either, since what to queue is what the walk
+            // would have said.
+            if (instance.onlyOnWifi && prepared.index.cold() && network.metered()) {
+                val parked = BackupReport(stopped = StoppedBecause.WaitingForWifi)
+                journal.ended(now(), parked.stopped, 0, 0)
+                narrateEnd(log, parked, queue)
+                return parked
+            }
+
             // A phone that has settled nothing asks the server before it sends
             // anything, or a reinstall is somebody's whole camera roll going up
             // again (stratus-app#124). If the asking fails there is no point
@@ -131,19 +144,21 @@ class BackupRun(
             // queues the same forty every time is sending them again.
             if (log.on) log.say("pass began: ${assets.size} seen, ${report.queued} queued, ${queue.left()} to send")
 
-            // After enqueuing and not before it, deliberately. Looking at the
-            // camera roll costs no data, and a pass that parks without queueing
-            // leaves the screen saying nothing is waiting while a hundred
-            // photographs are (stratus-app#133).
-            if (instance.onlyOnWifi && network.metered()) {
-                val parked = report.copy(stopped = StoppedBecause.WaitingForWifi)
-                advance(prepared.mark, queue, assets)
-                journal.ended(now(), parked.stopped, 0, 0)
-                narrateEnd(log, parked, queue)
-                return parked
-            }
-
             while (keepGoing()) {
+                // After enqueuing and not before it, deliberately: looking at
+                // the camera roll costs no data, and a pass that parks without
+                // queueing leaves the screen saying nothing is waiting while a
+                // hundred photographs are (stratus-app#133). And before every
+                // file rather than once a pass: one that began on wifi and left
+                // it was sending the rest of the queue over mobile data
+                // (stratus-app#235).
+                if (instance.onlyOnWifi && network.metered()) {
+                    val parked = report.copy(stopped = StoppedBecause.WaitingForWifi)
+                    advance(prepared.mark, queue, assets)
+                    journal.ended(now(), parked.stopped, parked.uploaded, parked.failed)
+                    narrateEnd(log, parked, queue)
+                    return parked
+                }
                 val step = queue.runNext()
                 onStep(step)
                 narrate(log, step, queue)

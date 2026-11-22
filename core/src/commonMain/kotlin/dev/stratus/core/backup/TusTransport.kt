@@ -51,11 +51,14 @@ class TusTransport(
         target: UploadTarget,
         resume: Resume?,
         body: UploadBody,
+        begun: suspend (Resume) -> Unit,
     ): UploadOutcome = try {
         val existing = resume?.handle
         if (existing == null) {
-            tus.begin(target)?.let { append(target, it, 0, body) }
-                ?: UploadOutcome.Failed(FailureKind.Transient, "the server would not start the upload")
+            tus.begin(target)?.let { handle ->
+                begun(Resume(handle, 0))
+                append(target, handle, 0, body)
+            } ?: UploadOutcome.Failed(FailureKind.Transient, "the server would not start the upload")
         } else {
             when (val offset = tus.offsetOf(existing)) {
                 // Gone: either it finished and the file is there, or twelve hours
@@ -71,6 +74,11 @@ class TusTransport(
                 }
             }
         }
+    } catch (e: CancellationException) {
+        // The system stopping the pass, which is not a failure of the file and
+        // must not be turned into one: what has to survive it is in the row
+        // already, put there by `begun`.
+        throw e
     } catch (e: Exception) {
         UploadOutcome.Failed(FailureKind.Transient, e.message ?: "no detail")
     }

@@ -121,6 +121,7 @@ class UploadQueue(
                 UploadTarget(upload.path, upload.size, upload.contentType),
                 resume,
                 bodyOf(upload),
+                begun = { pending.recordProgress(upload.path, it) },
             )
         } catch (e: CancellationException) {
             // The system stopping the pass is not the server refusing the file;

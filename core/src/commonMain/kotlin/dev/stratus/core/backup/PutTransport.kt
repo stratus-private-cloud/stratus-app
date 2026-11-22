@@ -20,6 +20,7 @@ class PutTransport(private val dav: DavClient) : Transport {
         target: UploadTarget,
         resume: Resume?,
         body: UploadBody,
+        begun: suspend (Resume) -> Unit,
     ): UploadOutcome =
         try {
             UploadOutcome.Done(dav.put(target.path, target.size, body.open(0), target.contentType))

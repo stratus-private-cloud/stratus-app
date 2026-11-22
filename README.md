@@ -511,7 +511,8 @@ be stopped.
 
 And from Android 12 that service is refused to an app nobody has open, which is
 most passes. A pass refused one runs without it, in the ten minutes Android
-gives any job, and the next one carries on where it stopped. A pass runs every
+gives any job, and the next one carries on where it stopped -- a video too
+long for ten minutes goes up ten minutes at a time. A pass runs every
 six hours and also a minute after a new photograph or video appears, so the
 notification shows mostly when the app is open or a pass was asked for.
 

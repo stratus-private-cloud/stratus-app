@@ -9,12 +9,14 @@ import io.ktor.client.plugins.HttpTimeoutConfig
 import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.Buffer
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class TusTransportTest {
@@ -47,6 +49,24 @@ class TusTransportTest {
         // There is no "finish" in the protocol: the file exists once the upload
         // is as long as it said it would be.
         assertEquals(UploadOutcome.Done("the-etag"), transport.send(target, null, uploadBody(::bytes)))
+    }
+
+    @Test
+    fun aTransferTheSystemStopsHasAlreadyHandedOverItsHandle() = runTest {
+        // stratus-app#230: a WorkManager stop is a cancellation, so no outcome
+        // ever carried the handle home and every pass began from byte zero.
+        val transport = transport { HttpStatusCode.Created to headersOf("Location", "/tus/abc") }
+        var begun: Resume? = null
+
+        assertFailsWith<CancellationException> {
+            transport.send(
+                target,
+                null,
+                uploadBody { throw CancellationException("Job was cancelled") },
+                begun = { begun = it },
+            )
+        }
+        assertEquals(Resume("http://host/tus/abc", 0), begun)
     }
 
     @OptIn(ExperimentalEncodingApi::class)

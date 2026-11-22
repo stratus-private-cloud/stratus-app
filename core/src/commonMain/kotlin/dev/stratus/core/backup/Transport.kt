@@ -147,8 +147,18 @@ interface Transport {
      *
      * [open] is called with the offset to start from, so nothing reads bytes
      * that are already on the server.
+     *
+     * [begun] is told the moment there is something to resume, before a byte
+     * is sent. Not left to the outcome: when the system stops a pass the
+     * outcome never arrives, and a handle that only travelled in it was a
+     * long video starting from zero on every pass (stratus-app#230).
      */
-    suspend fun send(target: UploadTarget, resume: Resume?, body: UploadBody): UploadOutcome
+    suspend fun send(
+        target: UploadTarget,
+        resume: Resume?,
+        body: UploadBody,
+        begun: suspend (Resume) -> Unit = {},
+    ): UploadOutcome
 }
 
 /**

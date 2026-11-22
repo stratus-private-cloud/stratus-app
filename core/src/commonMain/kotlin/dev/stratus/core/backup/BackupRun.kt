@@ -2,6 +2,8 @@ package dev.stratus.core.backup
 
 import dev.stratus.core.server.Server
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /** What a pass over the camera roll did, for whoever has to report it. */
 data class BackupReport(
@@ -96,87 +98,99 @@ class BackupRun(
         val queue = prepared.queue
 
         journal.began(now())
-        // Bounded by how far the last pass got, which is an optimisation and
-        // nothing more: everything already queued is in the database and goes
-        // out whatever this enumerates, and what has actually been sent is the
-        // settled record's answer (stratus-app#124).
-        val assets = source.assets(instance.sources, prepared.mark.read())
-
-        // A phone that has settled nothing asks the server before it sends
-        // anything, or a reinstall is somebody's whole camera roll going up
-        // again (stratus-app#124). If the asking fails there is no point
-        // guessing: uploading everything is the expensive mistake this is here
-        // to avoid, so the pass waits and tries again rather than paying it.
+        // Stopped by the system, the pass is a cancellation and none of the
+        // returns below is reached -- and a journal left saying it is running
+        // is a screen saying "Working" over a phone that is not (stratus-app#230).
+        var sofar = BackupReport()
         try {
-            prepared.index.warmUp(assets)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            val report = BackupReport(stopped = StoppedBecause.WaitingToRetry)
-            journal.ended(now(), report.stopped, 0, 0)
-            log.summarise("pass: could not ask the server what it already has; waiting")
-            return report
-        }
+            // Bounded by how far the last pass got, which is an optimisation and
+            // nothing more: everything already queued is in the database and goes
+            // out whatever this enumerates, and what has actually been sent is the
+            // settled record's answer (stratus-app#124).
+            val assets = source.assets(instance.sources, prepared.mark.read())
 
-        var report = BackupReport(queued = queue.enqueue(assets))
-        // Seen against queued is the whole diagnosis: a pass that enumerates
-        // forty photographs and queues none of them is working, and one that
-        // queues the same forty every time is sending them again.
-        if (log.on) log.say("pass began: ${assets.size} seen, ${report.queued} queued, ${queue.left()} to send")
-
-        // After enqueuing and not before it, deliberately. Looking at the
-        // camera roll costs no data, and a pass that parks without queueing
-        // leaves the screen saying nothing is waiting while a hundred
-        // photographs are (stratus-app#133).
-        if (instance.onlyOnWifi && network.metered()) {
-            val parked = report.copy(stopped = StoppedBecause.WaitingForWifi)
-            advance(prepared.mark, queue, assets)
-            journal.ended(now(), parked.stopped, 0, 0)
-            narrateEnd(log, parked, queue)
-            return parked
-        }
-
-        while (keepGoing()) {
-            val step = queue.runNext()
-            onStep(step)
-            narrate(log, step, queue)
-            report = when (step) {
-                is QueueStep.Idle -> {
-                    val done = report.copy(stopped = stoppedFrom(queue))
-                    advance(prepared.mark, queue, assets)
-                    journal.ended(now(), done.stopped, done.uploaded, done.failed)
-                    narrateEnd(log, done, queue)
-                    return done
-                }
-                // Nothing was learned about any photograph, and the next file
-                // would ask the same unanswering server. Ending here is one
-                // timeout for an outage instead of one per file, and
-                // `WaitingToRetry` is what brings the system back sooner than
-                // the ordinary interval (stratus-app#134).
-                is QueueStep.Unreachable -> {
-                    val done = report.copy(stopped = StoppedBecause.WaitingToRetry)
-                    advance(prepared.mark, queue, assets)
-                    journal.ended(now(), done.stopped, done.uploaded, done.failed)
-                    narrateEnd(log, done, queue)
-                    return done
-                }
-                is QueueStep.Uploaded -> report.copy(uploaded = report.uploaded + 1)
-                is QueueStep.GaveUp -> report.copy(failed = report.failed + 1)
-                // A retry, a partial upload or one the system is now carrying
-                // is neither done nor lost: the row stays, and this pass simply
-                // moves on to whatever is next.
-                is QueueStep.Retrying, is QueueStep.Progressed -> report
-                is QueueStep.HandedOver -> report.copy(handedOver = report.handedOver + 1)
+            // A phone that has settled nothing asks the server before it sends
+            // anything, or a reinstall is somebody's whole camera roll going up
+            // again (stratus-app#124). If the asking fails there is no point
+            // guessing: uploading everything is the expensive mistake this is here
+            // to avoid, so the pass waits and tries again rather than paying it.
+            try {
+                prepared.index.warmUp(assets)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                val report = BackupReport(stopped = StoppedBecause.WaitingToRetry)
+                journal.ended(now(), report.stopped, 0, 0)
+                log.summarise("pass: could not ask the server what it already has; waiting")
+                return report
             }
-            // Written per file so a screen reopened mid-backup says what is
-            // happening rather than what was happening when it last looked.
-            journal.sending((step as? QueueStep.Uploaded)?.path)
+
+            var report = BackupReport(queued = queue.enqueue(assets))
+            // Seen against queued is the whole diagnosis: a pass that enumerates
+            // forty photographs and queues none of them is working, and one that
+            // queues the same forty every time is sending them again.
+            if (log.on) log.say("pass began: ${assets.size} seen, ${report.queued} queued, ${queue.left()} to send")
+
+            // After enqueuing and not before it, deliberately. Looking at the
+            // camera roll costs no data, and a pass that parks without queueing
+            // leaves the screen saying nothing is waiting while a hundred
+            // photographs are (stratus-app#133).
+            if (instance.onlyOnWifi && network.metered()) {
+                val parked = report.copy(stopped = StoppedBecause.WaitingForWifi)
+                advance(prepared.mark, queue, assets)
+                journal.ended(now(), parked.stopped, 0, 0)
+                narrateEnd(log, parked, queue)
+                return parked
+            }
+
+            while (keepGoing()) {
+                val step = queue.runNext()
+                onStep(step)
+                narrate(log, step, queue)
+                report = when (step) {
+                    is QueueStep.Idle -> {
+                        val done = report.copy(stopped = stoppedFrom(queue))
+                        advance(prepared.mark, queue, assets)
+                        journal.ended(now(), done.stopped, done.uploaded, done.failed)
+                        narrateEnd(log, done, queue)
+                        return done
+                    }
+                    // Nothing was learned about any photograph, and the next file
+                    // would ask the same unanswering server. Ending here is one
+                    // timeout for an outage instead of one per file, and
+                    // `WaitingToRetry` is what brings the system back sooner than
+                    // the ordinary interval (stratus-app#134).
+                    is QueueStep.Unreachable -> {
+                        val done = report.copy(stopped = StoppedBecause.WaitingToRetry)
+                        advance(prepared.mark, queue, assets)
+                        journal.ended(now(), done.stopped, done.uploaded, done.failed)
+                        narrateEnd(log, done, queue)
+                        return done
+                    }
+                    is QueueStep.Uploaded -> report.copy(uploaded = report.uploaded + 1)
+                    is QueueStep.GaveUp -> report.copy(failed = report.failed + 1)
+                    // A retry, a partial upload or one the system is now carrying
+                    // is neither done nor lost: the row stays, and this pass simply
+                    // moves on to whatever is next.
+                    is QueueStep.Retrying, is QueueStep.Progressed -> report
+                    is QueueStep.HandedOver -> report.copy(handedOver = report.handedOver + 1)
+                }
+                // Written per file so a screen reopened mid-backup says what is
+                // happening rather than what was happening when it last looked.
+                journal.sending((step as? QueueStep.Uploaded)?.path)
+                sofar = report
+            }
+            val stopped = report.copy(stopped = StoppedBecause.AskedTo)
+            advance(prepared.mark, queue, assets)
+            journal.ended(now(), stopped.stopped, stopped.uploaded, stopped.failed)
+            narrateEnd(log, stopped, queue)
+            return stopped
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) {
+                journal.ended(now(), StoppedBecause.AskedTo, sofar.uploaded, sofar.failed)
+            }
+            throw e
         }
-        val stopped = report.copy(stopped = StoppedBecause.AskedTo)
-        advance(prepared.mark, queue, assets)
-        journal.ended(now(), stopped.stopped, stopped.uploaded, stopped.failed)
-        narrateEnd(log, stopped, queue)
-        return stopped
     }
 
     /**

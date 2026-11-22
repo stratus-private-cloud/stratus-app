@@ -62,7 +62,11 @@ Worth knowing before judging the app for it:
   foreground service is the reliable shape; battery managers on some OEMs will
   still interfere.
 - **Originals are uploaded as they are**, including HEIC and Live Photos. A
-  backup that transcodes is not a backup.
+  backup that transcodes is not a backup. On Android that includes **where a
+  photograph was taken**: Android strips the location from every photograph it
+  hands an app unless the app holds "access media location", which it grants
+  without asking once the photos are allowed. Versions before this one sent
+  the camera roll without it, and what they sent stays that way.
 - **It takes the phone's colours.** Light or dark follows the system setting,
   and on Android 12 and up the palette is the one Android derives from your
   wallpaper. Older Androids and iOS get Stratus's own.

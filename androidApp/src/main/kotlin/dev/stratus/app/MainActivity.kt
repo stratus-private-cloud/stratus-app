@@ -16,6 +16,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
 import dev.stratus.core.appContainer
 import dev.stratus.core.backup.AndroidAssetSource
 import dev.stratus.core.backup.BackupWorker
@@ -23,6 +24,7 @@ import dev.stratus.core.session.Ask
 import dev.stratus.ui.App
 import dev.stratus.ui.BackRequests
 import dev.stratus.ui.Shortcuts
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -54,6 +56,10 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // Apart from askFor, whose refusal opens the settings page: nobody is
+    // shown this request, so nobody should be sent anywhere when it fails.
+    private val askForLocations = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     private fun permissionsFor(asks: Set<Ask>): Array<String> = buildList {
         if (Ask.Photos in asks) addAll(photos)
@@ -91,6 +97,11 @@ class MainActivity : ComponentActivity() {
         // Asks Android to come back every few hours. Idempotent, so doing it on
         // every launch is how it survives a reinstall or a cleared app.
         BackupWorker.schedule(applicationContext)
+
+        val library = AndroidAssetSource(applicationContext)
+        lifecycleScope.launch {
+            if (library.lacksLocations()) askForLocations.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
+        }
 
         setContent {
             App(

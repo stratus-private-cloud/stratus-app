@@ -261,7 +261,12 @@ class AppContainer(
         return connections.to(instance)?.dav?.isStratusAtOrigin() == true
     }
 
-    suspend fun browser(scope: CoroutineScope, floor: String = "/", timeline: Boolean = false): BrowserController? {
+    suspend fun browser(
+        scope: CoroutineScope,
+        floor: String = "/",
+        timeline: Boolean = false,
+        trash: Boolean = false,
+    ): BrowserController? {
         val instance = instances.instance() ?: return null
         val connection = connections.to(instance) ?: return null
         val credentials = instances.credentials() ?: return null
@@ -273,6 +278,7 @@ class AppContainer(
             floor,
             timeline,
             uploads = picked?.let { QueuedHandUploads(backup) },
+            trash = trash,
         )
     }
 

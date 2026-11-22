@@ -443,6 +443,15 @@ Three surfaces, and no more than three:
    Read-only on purpose: naming, merging and taking a face out have no WebDAV
    verb, and an app that needed one would need a private API.
 
+   **The trash restores** (stratus-app#179), which is the opposite case: the
+   web's Restore and Destroy did have verbs, so the server was taught them
+   rather than the app being taught the server (stratus-backend#602). A
+   deletion carries `deleted-from`, Stratus's own property like `source`, and
+   restoring is a `MOVE` there; the server never replaces on it, so a 412 is
+   answered with the next ` (2)` the way a hand upload numbers. Destroying is
+   the `DELETE` the menu already had, asked as for good. `BrowserController`'s
+   `trash` is the switch, and nothing in it is renamed, shared or selected.
+
    **Music plays in the app** (stratus-app#180), behind a `Player` each
    platform implements and a `MusicController` in common code that turns a
    folder into a queue of signed links -- the cast's links, so the player

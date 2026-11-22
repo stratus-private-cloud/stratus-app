@@ -82,6 +82,7 @@ class BrowserControllerTest {
         base: String = "http://host/",
         floor: String = "/",
         timeline: Boolean = false,
+        trash: Boolean = false,
         answer: (HttpRequestData) -> Pair<HttpStatusCode, String>,
     ): BrowserController {
         val engine = MockEngine { request ->
@@ -103,6 +104,7 @@ class BrowserControllerTest {
             ) { 1_700_000_000 },
             floor,
             timeline,
+            trash = trash,
         )
     }
 
@@ -416,6 +418,51 @@ class BrowserControllerTest {
         browser.confirmDelete()
         browser.settled()
         assertTrue(seen.none { it.method.value == "DELETE" })
+    }
+
+    /** The trash as a Stratus lists it: a deletion that says where it was taken from (stratus-backend#602). */
+    private val deletion = """<multistatus xmlns="DAV:"><response><href>/trash/holiday/</href><propstat><prop>""" +
+        """<resourcetype><collection/></resourcetype><deleted-from xmlns="https://github.com/C0piIot/stratus">""" +
+        """<href xmlns="DAV:">/files/Photos/holiday</href></deleted-from></prop><status>HTTP/1.1 200 OK</status></propstat></response>""" +
+        """<response><href>/trash/notes.txt</href><propstat><prop><resourcetype/></prop>""" +
+        """<status>HTTP/1.1 200 OK</status></propstat></response></multistatus>"""
+
+    @Test
+    fun aDeletionIsRestoredWhereItWasTakenFromOrBesideIt() = runTest {
+        // stratus-app#179: the server never replaces on a MOVE out of the
+        // trash, so a taken name is asked for again as the web would land it.
+        val browser = controller(this, floor = "/trash/", trash = true) { request ->
+            when {
+                request.method.value != "MOVE" -> HttpStatusCode.MultiStatus to deletion
+                request.headers["Destination"]!!.endsWith("/holiday") -> HttpStatusCode.PreconditionFailed to ""
+                else -> HttpStatusCode.Created to ""
+            }
+        }
+        browser.start()
+        val holiday = browser.settled().entries.first { it.name == "holiday" }
+        assertEquals("/files/Photos/holiday", holiday.deletedFrom)
+
+        browser.restore(holiday)
+        val state = browser.settled()
+
+        val moves = seen.filter { it.method.value == "MOVE" }
+        assertEquals(
+            listOf("http://host/files/Photos/holiday", "http://host/files/Photos/holiday%20%282%29"),
+            moves.map { it.headers["Destination"] },
+        )
+        assertTrue(moves.all { it.url.encodedPath == "/trash/holiday" && it.headers["Overwrite"] == "F" })
+        assertEquals("/files/Photos/holiday (2)", state.restored)
+        assertNull(state.failure)
+    }
+
+    @Test
+    fun whatIsNotADeletionIsNotRestored() = runTest {
+        // Inside a deletion, or on a server that does not say: nothing to move.
+        val browser = controller(this, floor = "/trash/", trash = true) { HttpStatusCode.MultiStatus to deletion }
+        browser.start()
+        browser.restore(browser.settled().entries.first { it.name == "notes.txt" })
+        browser.settled()
+        assertTrue(seen.none { it.method.value == "MOVE" })
     }
 
     @Test

@@ -51,6 +51,7 @@ object Glyph {
     const val SEND = "\uE163"
     const val RENAME = EDIT
     const val DELETE = "\uE92E"
+    const val RESTORE = "\uE938"
     const val SELECTED = "\uF0BE"
     const val CLOSE = "\uE5CD"
 

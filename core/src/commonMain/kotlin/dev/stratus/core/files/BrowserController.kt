@@ -1,5 +1,7 @@
 package dev.stratus.core.files
 
+import dev.stratus.core.backup.MOST_COPIES
+import dev.stratus.core.backup.copyName
 import dev.stratus.core.dav.DavClient
 import dev.stratus.core.dav.DavError
 import dev.stratus.core.dav.DavResource
@@ -51,6 +53,13 @@ class BrowserController(
     val timeline: Boolean = false,
     /** What has been picked to upload into the folder on screen (stratus-app#127); null where nothing can be. */
     private val uploads: HandUploads? = null,
+    /**
+     * A Stratus's trash (stratus-app#179): a deletion is put back with a
+     * `MOVE` to where it was taken from and destroyed with a `DELETE`, the
+     * web page's two buttons as WebDAV verbs (stratus-backend#602), and
+     * nothing in it is renamed, shared or selected.
+     */
+    val trash: Boolean = false,
 ) {
     /** The originals the viewer has downloaded, so swiping back is not another download (stratus-app#238). */
     private val originals = KeptOriginals()
@@ -114,6 +123,8 @@ class BrowserController(
         if (path != mutable.value.path) scope.launch { originals.clear() }
         mutable.value = mutable.value.copy(
             path = path, busy = true, failure = null, pending = null, viewing = null, selected = emptySet(),
+            // Kept across the refresh after a restore, and dropped on the way anywhere else.
+            restored = mutable.value.restored.takeIf { path == mutable.value.path },
         )
         running = scope.launch { reload() }
         watch(path)
@@ -467,6 +478,28 @@ class BrowserController(
         }
     }
 
+    /**
+     * Puts a deletion back where it was taken from, or beside what has had
+     * that name since, ` (2)`, as the web's Restore lands it: the server never
+     * replaces on a `MOVE` out of the trash and answers 412, so the next name
+     * is asked for. A folder whose parent is gone is made again on the way.
+     */
+    fun restore(entry: DavResource) {
+        val from = entry.deletedFrom ?: return
+        act(entry) {
+            for (n in 1..MOST_COPIES) {
+                val to = copyName(from, n)
+                try {
+                    dav.move(entry.path, to)
+                    mutable.value = mutable.value.copy(restored = to)
+                    return@act
+                } catch (_: DavError.PreconditionFailed) {
+                }
+            }
+            throw DavError.PreconditionFailed(from)
+        }
+    }
+
     fun confirmRename(to: String) {
         val target = (mutable.value.pending as? Confirmation.Rename)?.target ?: return
         val name = to.trim()
@@ -479,7 +512,7 @@ class BrowserController(
 
     private fun act(target: DavResource, work: suspend () -> Unit) {
         running?.cancel()
-        mutable.value = mutable.value.copy(busy = true, pending = null, failure = null)
+        mutable.value = mutable.value.copy(busy = true, pending = null, failure = null, restored = null)
         running = scope.launch {
             try {
                 work()

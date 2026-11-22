@@ -216,6 +216,10 @@ fun BrowserScreen(
                     }
                 }
 
+                state.restored?.let {
+                    Text("Restored to ${it.trimStart('/')}", Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp))
+                }
+
                 if (cast != null) CastBar(cast)
 
                 // The one way to see what another client added since the folder was
@@ -263,7 +267,7 @@ fun BrowserScreen(
                                     playOnTap = playOnTap,
                                     selected = entry.path in state.selected,
                                     selecting = selecting,
-                                    onSelect = controller::toggle,
+                                    onSelect = if (controller.trash) null else controller::toggle,
                                 )
                                 HorizontalDivider()
                             }
@@ -576,6 +580,16 @@ private fun Actions(
         Action(Glyph.SCREEN, "Cast to a screen") { close(); cast.offer(entry) }
     }
     Action(Glyph.DETAILS, "Details") { close(); controller.details(entry) }
+    if (controller.trash) {
+        // A deletion is put back or destroyed whole; what is inside one is
+        // only read (stratus-app#179).
+        if (entry.deletedFrom != null) {
+            Action(Glyph.RESTORE, "Restore") { close(); controller.restore(entry) }
+            HorizontalDivider()
+            Action(Glyph.DELETE, "Delete for good", danger = true) { close(); controller.ask(Confirmation.Delete(entry)) }
+        }
+        return
+    }
     if (controller.canShare) {
         Action(Glyph.SHARE, "Share a link") { close(); controller.ask(Confirmation.Share(entry)) }
     }
@@ -626,7 +640,7 @@ private fun DeleteDialog(target: DavResource, controller: BrowserController) {
     AlertDialog(
         onDismissRequest = controller::dismiss,
         title = { Text("Delete ${target.name}?") },
-        text = { Text(WHERE_DELETED_GOES) },
+        text = { Text(if (controller.trash) "It is destroyed now and cannot be restored." else WHERE_DELETED_GOES) },
         confirmButton = { TextButton(onClick = controller::confirmDelete) { Text("Delete") } },
         dismissButton = { TextButton(onClick = controller::dismiss) { Text("Cancel") } },
     )

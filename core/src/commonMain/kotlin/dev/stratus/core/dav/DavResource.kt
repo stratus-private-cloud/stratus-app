@@ -23,6 +23,12 @@ data class DavResource(
      * including on every other server.
      */
     val source: String? = null,
+    /**
+     * Where a deletion in a Stratus's trash was taken from, in the same form
+     * as [path]: what restoring it moves it back to (stratus-backend#602).
+     * Only on a deletion, and null on every other server.
+     */
+    val deletedFrom: String? = null,
 ) {
     val name: String get() = path.trimEnd('/').substringAfterLast('/')
 }

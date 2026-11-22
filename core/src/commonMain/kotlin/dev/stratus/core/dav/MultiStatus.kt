@@ -153,6 +153,7 @@ internal object MultiStatus {
                 etag = kept.etag,
                 lastModifiedEpochMs = kept.lastModified,
                 source = kept.source?.let { pathOf(it, basePath) },
+                deletedFrom = kept.deletedFrom?.let { pathOf(it, basePath) },
             ),
             status,
         )
@@ -205,12 +206,13 @@ internal object MultiStatus {
     }
 
     /**
-     * [READS], and the one property of Stratus's own this reads. Asking any
-     * other server for it costs a 404 in the answer's second propstat.
+     * [READS], and the two properties of Stratus's own this reads. Asking
+     * any other server for them costs a 404 in the answer's second propstat.
      */
     private fun StringBuilder.appendReads() {
         for (name in READS) append("<").append(name).append("/>")
         append("<source xmlns=\"").append(STRATUS).append("\"/>")
+        append("<deleted-from xmlns=\"").append(STRATUS).append("\"/>")
     }
 
     /**
@@ -251,6 +253,10 @@ internal object MultiStatus {
         eachChild { ns, name ->
             if (ns == STRATUS && name == "source") {
                 props = props.copy(source = readHref())
+                return@eachChild
+            }
+            if (ns == STRATUS && name == "deleted-from") {
+                props = props.copy(deletedFrom = readHref())
                 return@eachChild
             }
             if (ns != DAV) {
@@ -343,6 +349,7 @@ internal object MultiStatus {
         val etag: String? = null,
         val lastModified: Long? = null,
         val source: String? = null,
+        val deletedFrom: String? = null,
     ) {
         fun merge(other: Props) = Props(
             isDirectory ?: other.isDirectory,
@@ -351,6 +358,7 @@ internal object MultiStatus {
             etag ?: other.etag,
             lastModified ?: other.lastModified,
             source ?: other.source,
+            deletedFrom ?: other.deletedFrom,
         )
     }
 }

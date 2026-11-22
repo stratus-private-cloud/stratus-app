@@ -15,6 +15,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** Browsing a real server, started by `make conformance`. */
 class BrowserConformanceTest {
@@ -94,5 +95,52 @@ class BrowserConformanceTest {
         val after = browser.settled()
         assertNull(after.failure, "was ${after.failure}")
         assertEquals(listOf("renamed"), after.entries.map { it.name })
+    }
+
+    @Test
+    fun aDeletionIsRestoredFromTheTrashAndThenBesideWhatTookItsName() = runTest {
+        // stratus-app#179 over stratus-backend#602: the trash is at the origin,
+        // beside files/, so this one browses from there as the app does.
+        val origin = DavClient(stratusHttpClient(CIO.create(), credentials), url.removeSuffix("/").removeSuffix("files"))
+        val folder = "/files$root"
+        origin.makeCollection(folder)
+        origin.put("$folder/notes.txt", "first".encodeToByteArray(), "text/plain")
+        origin.delete("$folder/notes.txt")
+
+        val bin = BrowserController(origin, handoff, this, floor = "/trash/", trash = true)
+        bin.start()
+        val deletion = bin.settled().entries.first { it.deletedFrom == "$folder/notes.txt" }
+
+        bin.restore(deletion)
+        val restored = bin.settled()
+        assertNull(restored.failure, "was ${restored.failure}")
+        assertEquals("$folder/notes.txt", restored.restored)
+        assertEquals(5L, origin.stat("$folder/notes.txt").size)
+
+        // Deleted again and the name taken meanwhile: it lands beside, as the web's Restore does.
+        origin.delete("$folder/notes.txt")
+        origin.put("$folder/notes.txt", "second".encodeToByteArray(), "text/plain")
+        bin.refresh()
+        bin.restore(bin.settled().entries.first { it.deletedFrom == "$folder/notes.txt" })
+        assertEquals("$folder/notes (2).txt", bin.settled().restored)
+        assertEquals(6L, origin.stat("$folder/notes.txt").size)
+    }
+
+    @Test
+    fun aDeletionIsDestroyedFromTheTrash() = runTest {
+        val origin = DavClient(stratusHttpClient(CIO.create(), credentials), url.removeSuffix("/").removeSuffix("files"))
+        val folder = "/files$root"
+        origin.makeCollection(folder)
+        origin.delete(folder)
+
+        val bin = BrowserController(origin, handoff, this, floor = "/trash/", trash = true)
+        bin.start()
+        val deletion = bin.settled().entries.first { it.deletedFrom == folder }
+        bin.ask(Confirmation.Delete(deletion))
+        bin.confirmDelete()
+
+        val after = bin.settled()
+        assertNull(after.failure, "was ${after.failure}")
+        assertTrue(after.entries.none { it.deletedFrom == folder })
     }
 }

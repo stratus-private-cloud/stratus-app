@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 # CI for reasons belonging to another repo, and the two tests that pin current
 # server limitations would flip without anybody deciding to look. Bumping this
 # is a commit, which is the point.
-IMAGE="${BACKEND_IMAGE:-ghcr.io/stratus-private-cloud/stratus-backend@sha256:9cd26034938f1e31a01c311c12337c3183eea83cdf3d921225b250df7284539c}"
+IMAGE="${BACKEND_IMAGE:-ghcr.io/stratus-private-cloud/stratus-backend@sha256:34bc1a962ab4c9fb16a45a2eb7c8d2ae4645701c2554111d812837bb066c9201}"
 
 DAV_USER="${DAV_USER:-conformance}"
 DAV_PASS="${DAV_PASS:-conformance-secret}"

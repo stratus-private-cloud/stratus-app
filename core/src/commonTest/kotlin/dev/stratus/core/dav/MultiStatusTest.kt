@@ -220,4 +220,19 @@ class MultiStatusTest {
         )
         assertEquals(MediaInfo(), info)
     }
+
+    @Test
+    fun aDeletionSaysWhereItWasTakenFrom() {
+        // stratus-backend#602, and nothing on a server that answers 404 for it.
+        val xml = """<D:multistatus xmlns:D="DAV:"><D:response><D:href>/trash/my%20album/</D:href><D:propstat><D:prop>""" +
+            """<D:resourcetype><D:collection/></D:resourcetype><deleted-from xmlns="https://github.com/C0piIot/stratus">""" +
+            """<D:href xmlns:D="DAV:">/files/my%20album</D:href></deleted-from></D:prop><D:status>HTTP/1.1 200 OK</D:status>""" +
+            """</D:propstat></D:response><D:response><D:href>/files/x.jpg</D:href><D:propstat><D:prop><D:resourcetype/>""" +
+            """</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat><D:propstat><D:prop>""" +
+            """<deleted-from xmlns="https://github.com/C0piIot/stratus"/></D:prop><D:status>HTTP/1.1 404 Not Found</D:status>""" +
+            """</D:propstat></D:response></D:multistatus>"""
+        val (deletion, plain) = MultiStatus.parse(xml, "")
+        assertEquals("/files/my album", deletion.deletedFrom)
+        assertNull(plain.deletedFrom)
+    }
 }

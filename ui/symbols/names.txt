@@ -26,6 +26,7 @@ pause
 person
 picture_as_pdf
 play_arrow
+restore_from_trash
 search
 send
 settings

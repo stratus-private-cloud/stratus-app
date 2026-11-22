@@ -325,8 +325,13 @@ selected. The indexer's half is Stratus's own properties
 (stratus-backend#502); any other server answers without them and the dialog
 is what the listing knew.
 
-What is not there yet: the trash can be looked through and copied out of but
-not restored from (stratus-app#179).
+**The trash restores and destroys** (stratus-app#179), on a Stratus: each
+deletion's menu puts it back where it was taken from -- beside it as
+`(2)` when that name has been taken since, as the web's Restore does -- or
+destroys it after asking. It is a `MOVE` and a `DELETE` on the server's own
+trash collection, standard WebDAV, so it needs a server that has them
+(stratus-backend#602). What is inside a deletion is opened or copied out, one
+file at a time.
 
 ## Looking at photographs
 

@@ -258,7 +258,7 @@ private fun SignedIn(
         } else {
             container.browser(scope)?.let { mapOf(Part.Files to it) }.orEmpty()
         }
-        trash = if (parts.size > 1) container.browser(scope, TRASH) else null
+        trash = if (parts.size > 1) container.browser(scope, TRASH, trash = true) else null
         people = if (parts.size > 1) container.browser(scope, PEOPLE) else null
         faces = emptyList()
         peopleListed = false

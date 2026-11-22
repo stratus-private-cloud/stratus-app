@@ -19,6 +19,8 @@ data class BrowserState(
     val more: Boolean = false,
     /** Files picked by hand on their way into this folder, drawn above what is in it (stratus-app#127). */
     val uploads: List<HandUpload> = emptyList(),
+    /** Where the last deletion put back from the trash landed, to be said (stratus-app#179). */
+    val restored: String? = null,
 )
 
 /** One month of a timeline: the collection it was listed from, and its files. */

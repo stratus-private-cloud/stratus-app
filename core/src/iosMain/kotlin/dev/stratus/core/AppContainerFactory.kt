@@ -10,6 +10,7 @@ import dev.stratus.core.net.darwinTrust
 import dev.stratus.core.net.basicAuthHeader
 import dev.stratus.core.backup.negotiateTus
 import dev.stratus.core.backup.BackgroundUploads
+import dev.stratus.core.backup.HandOverBudget
 import dev.stratus.core.backup.IosNetwork
 import dev.stratus.core.backup.BackgroundTusTransport
 import dev.stratus.core.backup.BackgroundPutTransport
@@ -92,7 +93,10 @@ private fun build(registersDomains: Boolean): AppContainer {
     // Built before the container because the container's transports close over
     // it, and because there is exactly one session per process.
     lateinit var holder: AppContainer
-    val uploads = BackgroundUploads { ticket, answer -> holder.backup.settle(ticket, answer) }
+    val uploads = BackgroundUploads(
+        settle = { ticket, answer -> holder.backup.settle(ticket, answer) },
+        topUp = { holder.backup.pass() },
+    )
     uploadSession = uploads
     return AppContainer(
     engine = { policy ->
@@ -145,7 +149,8 @@ private fun build(registersDomains: Boolean): AppContainer {
             ?.let { BackgroundTusTransport(connection.http, it, uploads, credentials) }
             ?: BackgroundPutTransport(instance.baseUrl, uploads, credentials)
     },
-    liveTransfers = { uploads.live() },
+    liveTransfers = { uploads.live().also { BackgroundUploads.sweep(it) } },
+    handOverAtMost = HandOverBudget.Ios,
     ).also { holder = it }
 }
 

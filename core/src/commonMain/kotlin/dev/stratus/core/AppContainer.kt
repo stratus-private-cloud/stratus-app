@@ -6,6 +6,7 @@ import dev.stratus.core.calendars.calendarSetup
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import dev.stratus.core.backup.AssetSource
 import dev.stratus.core.backup.Backup
+import dev.stratus.core.backup.HandOverBudget
 import dev.stratus.core.backup.BackupDatabase
 import dev.stratus.core.backup.Connection
 import dev.stratus.core.backup.KeptConnections
@@ -73,6 +74,8 @@ class AppContainer(
     /** See [Backup]'s own parameter: the one thing a platform answers differently. */
     private val transports: (suspend (Connection, Server) -> Transport)? = null,
     private val liveTransfers: (suspend () -> Set<String>)? = null,
+    /** See [Backup]'s own parameter: where transfers are handed over, how many at once. */
+    private val handOverAtMost: HandOverBudget? = null,
     /** What this connection costs, which only the platform knows (stratus-app#133). */
     private val network: Network = Network { false },
     /** The platform's player, or null where there is none yet. */
@@ -113,7 +116,7 @@ class AppContainer(
         if (transports == null) {
             Backup(instances, database, assets, connections, network = network)
         } else {
-            Backup(instances, database, assets, connections, transports, liveTransfers, network)
+            Backup(instances, database, assets, connections, transports, liveTransfers, network, handOverAtMost)
         }
     }
 

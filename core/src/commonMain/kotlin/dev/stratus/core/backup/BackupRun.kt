@@ -72,6 +72,8 @@ class BackupRun(
     private val logFor: (Server) -> BackupLog = { BackupLog(it.baseUrl) },
     /** What this connection costs, for the one setting that cares. */
     private val network: Network = Network { false },
+    /** What may be left in the system's hands at once; null where nothing is handed over. */
+    private val handOverAtMost: HandOverBudget? = null,
 ) {
     /**
      * Runs one pass for [instance].
@@ -152,6 +154,15 @@ class BackupRun(
                 // file rather than once a pass: one that began on wifi and left
                 // it was sending the rest of the queue over mobile data
                 // (stratus-app#235).
+                // Enough with the system already, from this pass or one before:
+                // the rest is handed over as it answers (stratus-app#233).
+                if (handOverAtMost != null && handOverAtMost.spent(queue.summary())) {
+                    val held = report.copy(stopped = StoppedBecause.InFlight)
+                    advance(prepared.mark, queue, assets)
+                    journal.ended(now(), held.stopped, held.uploaded, held.failed)
+                    narrateEnd(log, held, queue)
+                    return held
+                }
                 if (instance.onlyOnWifi && network.metered()) {
                     val parked = report.copy(stopped = StoppedBecause.WaitingForWifi)
                     advance(prepared.mark, queue, assets)

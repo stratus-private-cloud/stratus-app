@@ -25,6 +25,8 @@ data class PendingSummary(
     val nextAttemptAt: Long?,
     /** What the server said about something given up on, for a screen to quote. */
     val givenUpDetail: String? = null,
+    /** What [inFlight] has left to send, for the budget a pass hands over to (stratus-app#233). */
+    val inFlightBytes: Long = 0,
 )
 
 /** One outstanding piece of work: one part of one asset. */
@@ -219,7 +221,8 @@ class PendingStore(
                    SUM(CASE WHEN ticket IS NOT NULL THEN 1 ELSE 0 END),
                    COALESCE(SUM(size - offset_at), 0),
                    MIN(CASE WHEN next_at < ? THEN next_at ELSE NULL END),
-                   MAX(CASE WHEN next_at >= ? THEN last_error ELSE NULL END)
+                   MAX(CASE WHEN next_at >= ? THEN last_error ELSE NULL END),
+                   COALESCE(SUM(CASE WHEN ticket IS NOT NULL THEN size - offset_at ELSE 0 END), 0)
             FROM pending
             """.trimIndent(),
         ).use { statement ->
@@ -234,6 +237,7 @@ class PendingStore(
                 bytesLeft = statement.getLong(3),
                 nextAttemptAt = if (statement.isNull(4)) null else statement.getLong(4).takeIf { it > now },
                 givenUpDetail = if (statement.isNull(5)) null else statement.getText(5),
+                inFlightBytes = statement.getLong(6),
             )
         }
     }

@@ -75,6 +75,7 @@ class BackupRunTest {
         directories: DirectoryMaker = DirectoryMaker { },
         transport: Transport = Always(outcome),
         network: Network = Network { metered },
+        handOverAtMost: HandOverBudget? = null,
     ): BackupRun {
         database.migrate()
         return BackupRun(
@@ -98,6 +99,7 @@ class BackupRunTest {
             journalFor = { database.journal() },
             logFor = { BackupLog(it.baseUrl, sink) },
             network = network,
+            handOverAtMost = handOverAtMost,
         )
     }
 
@@ -404,5 +406,56 @@ class BackupRunTest {
         run.once(instance)
 
         assertEquals(listOf(0L, 0L), roll.boundedBy)
+    }
+
+    // ---- What is left in the system's hands (stratus-app#233) -------------
+
+    private val handsOver = object : Transport {
+        override val resumable = false
+        var tickets = 0
+        override suspend fun send(
+            target: UploadTarget,
+            resume: Resume?,
+            body: UploadBody,
+            begun: suspend (Resume) -> Unit,
+        ): UploadOutcome = UploadOutcome.HandedOver("t-${++tickets}")
+    }
+
+    @Test
+    fun aPassHandsOverNoMoreThanItsBudget() = runTest {
+        // With nothing to stop it, a first backup on iOS spooled the whole
+        // camera roll into tmp and opened an upload per photograph.
+        val roll = RollOf((1..5).map { asset(it) })
+        val run = run(roll, transport = handsOver, handOverAtMost = HandOverBudget(files = 2, bytes = 1_000))
+
+        val first = run.once(instance)
+        assertEquals(StoppedBecause.InFlight, first.stopped)
+        assertEquals(2, first.handedOver)
+
+        // What a pass before left in flight counts against the next.
+        val second = run.once(instance)
+        assertEquals(0, second.handedOver)
+        assertEquals(StoppedBecause.InFlight, second.stopped)
+    }
+
+    @Test
+    fun theBudgetInBytesStillLetsOneLargeFileThrough() = runTest {
+        // Each asset is ten bytes. Against five, one goes because nothing else
+        // is in flight -- or a video larger than the budget would never go --
+        // and the next waits for it.
+        val roll = RollOf((1..3).map { asset(it) })
+        val report = run(roll, transport = handsOver, handOverAtMost = HandOverBudget(files = 8, bytes = 5)).once(instance)
+
+        assertEquals(1, report.handedOver)
+        assertEquals(StoppedBecause.InFlight, report.stopped)
+    }
+
+    @Test
+    fun withNoBudgetEverythingIsHandedOver() = runTest {
+        // Android hands nothing over and passes no budget; the loop is as it was.
+        val roll = RollOf((1..5).map { asset(it) })
+        val report = run(roll, transport = handsOver).once(instance)
+
+        assertEquals(5, report.handedOver)
     }
 }

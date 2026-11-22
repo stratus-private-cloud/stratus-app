@@ -77,6 +77,8 @@ class Backup(
     private val liveTransfers: (suspend () -> Set<String>)? = null,
     /** What the connection costs, for the server that asked not to pay it. */
     private val network: Network = Network { false },
+    /** How much may be in the system's hands at once, where transfers are handed over (stratus-app#233). */
+    private val handOverAtMost: HandOverBudget? = null,
 ) {
     /** What to say about the backup, assembled from what the queue actually holds. */
     val status: BackupStatus by lazy {
@@ -167,6 +169,7 @@ class Backup(
         prepareFor = { prepare() },
         journalFor = { database.journal() },
         network = network,
+        handOverAtMost = handOverAtMost,
     )
 
     /**

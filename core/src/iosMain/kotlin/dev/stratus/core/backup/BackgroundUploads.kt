@@ -1,5 +1,7 @@
 package dev.stratus.core.backup
 
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
@@ -41,6 +43,12 @@ import kotlin.coroutines.resume
 class BackgroundUploads(
     /** Told what the platform saw, by the ticket the transfer carries. */
     private val settle: suspend (ticket: String, answer: TransferAnswer) -> Unit,
+    /**
+     * A short pass, run when the system relaunches the app to report: it is
+     * what hands over the next few, since a pass leaves only so many with the
+     * system at once (stratus-app#233) and the next BGTask comes when it does.
+     */
+    private val topUp: suspend () -> Unit = {},
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -139,7 +147,12 @@ class BackgroundUploads(
         }
 
         override fun URLSessionDidFinishEventsForBackgroundURLSession(session: NSURLSession) {
-            onEventsDelivered?.invoke()
+            // The system gives a relaunch about thirty seconds before it wants
+            // the completion handler back, so the top-up stops well short.
+            scope.launch {
+                withTimeoutOrNull(TOP_UP_FOR) { topUp() }
+                onEventsDelivered?.invoke()
+            }
         }
     }
 
@@ -147,6 +160,30 @@ class BackgroundUploads(
         const val SESSION = "dev.stratus.uploads"
 
         /** Where a body waits to be collected. A function of the ticket, so nothing has to remember it. */
-        fun spoolPath(ticket: String): Path = Path(NSTemporaryDirectory() + "stratus-upload-" + ticket)
+        fun spoolPath(ticket: String): Path = Path(NSTemporaryDirectory() + SPOOL + ticket)
+
+        private const val SPOOL = "stratus-upload-"
+        private val TOP_UP_FOR = 20.seconds
+
+        /**
+         * Deletes the bodies in [dir] whose ticket the system is not carrying
+         * (stratus-app#233): a pass that died while it spooled one left a copy
+         * of a photograph that no task and no row will ever claim. Asked inside
+         * a pass, which holds the lock every pass takes, so no spool another
+         * pass is filling can be one of them.
+         */
+        fun sweep(dir: Path, live: Set<String>): Int {
+            var gone = 0
+            for (path in SystemFileSystem.list(dir)) {
+                val ticket = path.name.removePrefix(SPOOL)
+                if (ticket == path.name || ticket in live) continue
+                SystemFileSystem.delete(path, mustExist = false)
+                gone++
+            }
+            return gone
+        }
+
+        /** [sweep] over where spools are actually written. */
+        fun sweep(live: Set<String>): Int = sweep(Path(NSTemporaryDirectory()), live)
     }
 }

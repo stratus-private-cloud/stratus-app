@@ -187,3 +187,23 @@ suspend fun transportFor(connection: Connection, baseUrl: String): Transport =
             }
         }
         ?: PutTransport(connection.dav)
+
+/**
+ * How much a pass may leave in the system's hands at once (stratus-app#233).
+ *
+ * Only where transfers are handed over -- iOS -- since a handed-over row is
+ * skipped and the pass goes straight to the next: with nothing to stop it, a
+ * first backup spooled the whole camera roll into the temporary directory and
+ * opened an upload per photograph that expires in twelve hours. A file is
+ * handed over whatever its size while nothing else is in flight, or a video
+ * larger than [bytes] would wait for ever.
+ */
+data class HandOverBudget(val files: Int, val bytes: Long) {
+    fun spent(summary: PendingSummary): Boolean =
+        summary.inFlight >= files || (summary.inFlight > 0 && summary.inFlightBytes >= bytes)
+
+    companion object {
+        /** Eight files and half a gigabyte: a few minutes of work for the system, and a tmp it can spare. */
+        val Ios = HandOverBudget(files = 8, bytes = 512L * 1024 * 1024)
+    }
+}

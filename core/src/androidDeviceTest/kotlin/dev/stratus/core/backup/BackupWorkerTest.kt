@@ -5,7 +5,12 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import androidx.work.Configuration
 import androidx.work.ListenableWorker
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.testing.SynchronousExecutor
+import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.work.testing.TestListenableWorkerBuilder
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -53,6 +58,27 @@ class BackupWorkerTest {
             .setForegroundUpdater { _, _, _ -> throw IllegalStateException("not from the background") }
             .build()
         assertFalse(refused.intoTheForeground())
+    }
+
+    @Test
+    fun aTriggerReArmsItselfAndHandsThePassOnEvenSignedOut() = runTest {
+        // stratus-app#232: nobody is signed in here, which used to end the
+        // chain -- the trigger returned before it re-armed.
+        WorkManagerTestInitHelper.initializeTestWorkManager(
+            context,
+            Configuration.Builder().setExecutor(SynchronousExecutor()).build(),
+        )
+        val trigger = TestListenableWorkerBuilder<BackupWorker>(context)
+            .setTags(listOf(BackupWorker.NEW_MEDIA))
+            .build()
+
+        assertEquals(ListenableWorker.Result.success(), trigger.doWork())
+
+        val work = WorkManager.getInstance(context)
+        val armed = work.getWorkInfosForUniqueWork(BackupWorker.NEW_MEDIA).get()
+        assertTrue(armed.any { it.state == WorkInfo.State.ENQUEUED }, "not re-armed: $armed")
+        val pass = work.getWorkInfosForUniqueWork(BackupWorker.ONCE).get()
+        assertTrue(pass.any { it.state == WorkInfo.State.ENQUEUED }, "no pass handed on: $pass")
     }
 
     @Test

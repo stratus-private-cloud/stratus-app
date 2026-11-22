@@ -69,7 +69,7 @@ class AndroidAssetSource(private val context: Context) : AssetSource {
             if (addedAfterEpochMs > 0) {
                 // DATE_ADDED is in seconds, which is a difference worth a bug if
                 // it goes unnoticed: milliseconds here would skip everything.
-                conditions += "$DATE_ADDED > ?"
+                conditions += "$DATE_ADDED >= ?"
                 arguments += (addedAfterEpochMs / 1_000).toString()
             }
 

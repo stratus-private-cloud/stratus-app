@@ -107,7 +107,7 @@ class BackupRun(
             // nothing more: everything already queued is in the database and goes
             // out whatever this enumerates, and what has actually been sent is the
             // settled record's answer (stratus-app#124).
-            val assets = source.assets(instance.sources, prepared.mark.read())
+            val assets = source.assets(instance.sources, lookingBackFrom(prepared.mark.read()))
 
             // A phone that has settled nothing asks the server before it sends
             // anything, or a reinstall is somebody's whole camera roll going up
@@ -240,6 +240,17 @@ class BackupRun(
      * What is already queued is unaffected either way. The queue is the
      * database, so a row below the bound is still sent.
      */
+    /**
+     * The bound a pass asks for, a day behind the mark (stratus-app#231).
+     *
+     * The mark is the newest arrival a pass saw, and something can become
+     * visible after it with an older one: a video is inserted when recording
+     * starts and hidden until it stops, and a pass another photograph started
+     * meanwhile moved the mark past it for good. Looking back a day costs a
+     * listing of a day of photographs the settled record already answers.
+     */
+    private fun lookingBackFrom(mark: Long): Long = if (mark <= 0) 0 else maxOf(1, mark - LOOK_BACK_MS)
+
     private suspend fun advance(mark: BackupMark, queue: UploadQueue, assets: List<Asset>) {
         if (assets.isEmpty() || assets.any { it.addedAtEpochMs <= 0 }) return
         val owed = queue.outstanding().mapTo(mutableSetOf()) { it.localId }
@@ -261,5 +272,9 @@ class BackupRun(
             left.inFlight > 0 -> StoppedBecause.InFlight
             else -> StoppedBecause.WaitingToRetry
         }
+    }
+
+    companion object {
+        const val LOOK_BACK_MS = 24 * 60 * 60 * 1_000L
     }
 }

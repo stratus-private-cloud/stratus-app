@@ -17,9 +17,11 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 private class RollOf(
-    private val assets: List<Asset>,
+    assets: List<Asset>,
     private val access: MediaAccess = MediaAccess.Full,
 ) : AssetSource {
+    /** Added to by a test, for what appears between passes. */
+    val photos = assets.toMutableList()
     val askedFor = mutableListOf<Set<String>>()
     val boundedBy = mutableListOf<Long>()
     override suspend fun access() = access
@@ -29,7 +31,7 @@ private class RollOf(
         boundedBy += addedAfterEpochMs
         // The bound as both platforms apply it: no bound at zero, and a
         // photograph whose arrival is unknown is never skipped by one.
-        return assets.filter { addedAfterEpochMs <= 0 || it.addedAtEpochMs <= 0 || it.addedAtEpochMs > addedAfterEpochMs }
+        return photos.filter { addedAfterEpochMs <= 0 || it.addedAtEpochMs <= 0 || it.addedAtEpochMs > addedAfterEpochMs }
     }
     override suspend fun open(localId: String, part: AssetPart, from: Long): RawSource =
         Buffer().apply { write(ByteArray(10), 0, 10) }
@@ -215,11 +217,26 @@ class BackupRunTest {
         run.once(instance)
         run.once(instance)
 
-        // The first pass looks at everything, and the second starts where it
-        // stopped: a phone with forty thousand photographs should not read all
-        // of them to find the three that are new.
+        // The first pass looks at everything, and the second starts a day
+        // before where it stopped: a phone with forty thousand photographs
+        // should not read all of them to find the three that are new.
         assertEquals(0L, roll.boundedBy.first())
-        assertEquals(utcMillis(2026, 9, 2), roll.boundedBy.last())
+        assertEquals(utcMillis(2026, 9, 2) - BackupRun.LOOK_BACK_MS, roll.boundedBy.last())
+    }
+
+    @Test
+    fun somethingThatAppearsAfterTheMarkPassedItIsStillSent() = runTest {
+        // stratus-app#231: a video inserted when recording starts is hidden
+        // until it stops, and a pass another photograph started meanwhile moves
+        // the mark past it. Without the look-back it was never seen again.
+        val roll = RollOf(listOf(asset(2, addedAt = utcMillis(2026, 9, 2, 12))))
+        val run = run(roll)
+        run.once(instance)
+
+        roll.photos += asset(3, addedAt = utcMillis(2026, 9, 2, 11))
+        val report = run.once(instance)
+
+        assertEquals(1, report.uploaded, "bounded by ${roll.boundedBy}")
     }
 
     @Test
@@ -231,7 +248,7 @@ class BackupRunTest {
         run.once(instance)
         run.once(instance)
 
-        assertEquals(utcMillis(2026, 9, 1) - 1, roll.boundedBy.last())
+        assertEquals(utcMillis(2026, 9, 1) - 1 - BackupRun.LOOK_BACK_MS, roll.boundedBy.last())
     }
 
     @Test

@@ -292,7 +292,10 @@ than it sounds: `MediaStore.DATE_ADDED` is always there on Android, and on iOS
 `PHAsset.addedDate` is **iOS 26** while the deployment target is 15 — asked for
 through a selector check rather than called, so older versions answer zero and
 the bound simply never moves. Which is safe precisely because the bound decides
-nothing: the settled record does.
+nothing: the settled record does. **Except for what it hides**, which is why a pass asks for a
+day before the mark rather than from it (stratus-app#231): a video is inserted
+when recording starts and hidden until it stops, and a pass that another
+photograph started meanwhile moved the mark past it for good.
 
 **A listing asks for the five properties it reads and no others.** This was
 `allprop` on the reasoning that a round trip costs the same either way, which is

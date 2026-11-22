@@ -1214,7 +1214,11 @@ Three things about it are worth keeping.
 enqueues on a metered connection and only then stops, because looking at the
 camera roll costs no data and a pass that parked before queueing would leave
 the backup screen saying nothing is waiting while the roll fills up. That is
-the surface's whole job.
+the surface's whole job. **Asked before every file**, not once a pass
+(stratus-app#235): one that began on wifi and left it went on over mobile data.
+**And a cold start parks before it walks the server**, since that walk is a
+listing per month and is data too; it queues nothing then, because what to
+queue is what the walk would have said.
 
 **The decision is in `BackupRun` and the platforms answer a fact.** `Network`
 is one question -- is this connection metered -- answered by

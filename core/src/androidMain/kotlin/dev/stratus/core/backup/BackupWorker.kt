@@ -38,6 +38,19 @@ class BackupWorker(
 ) : CoroutineWorker(context, parameters) {
 
     override suspend fun doWork(): Result {
+        // The trigger does nothing but re-arm and hand over (stratus-app#232).
+        // Re-arming after the pass meant a trigger that fired while signed out,
+        // or a pass that threw, ended the chain until the app was opened; a
+        // retry kept the content constraint and so waited for another photograph
+        // as well as the backoff; and the next trigger sat blocked behind a long
+        // pass, so nothing watched the roll while one ran. The pass itself goes
+        // on the same chain a tap does, where a second one is run by the first.
+        if (NEW_MEDIA in tags) {
+            watchForNewMedia(applicationContext, ExistingWorkPolicy.APPEND_OR_REPLACE)
+            enqueueOnce(applicationContext, connected)
+            return Result.success()
+        }
+
         val backup = appContainer(applicationContext).backup
         if (backup.enabled() == null) return Result.success()
 
@@ -53,8 +66,6 @@ class BackupWorker(
                 }
             },
         )
-
-        if (NEW_MEDIA in tags) watchForNewMedia(applicationContext, ExistingWorkPolicy.APPEND_OR_REPLACE)
 
         // Coming back later is WorkManager's job; whether there is a reason to
         // is the queue's, and which item is ready is the queue's too. The two
@@ -125,7 +136,8 @@ class BackupWorker(
         /** Public for the end-to-end suite, which waits on the pass it asked for. */
         const val ONCE = "stratus-backup-now"
         private const val ON_WIFI = "stratus-backup-on-wifi"
-        private const val NEW_MEDIA = "stratus-backup-on-new-media"
+        /** Internal for the device test, which looks for it re-armed. */
+        internal const val NEW_MEDIA = "stratus-backup-on-new-media"
         private const val LOG = "StratusBackup"
 
         /**
@@ -152,8 +164,8 @@ class BackupWorker(
          * Runs a pass when the camera roll changes, so a photograph does not
          * wait for the six hours.
          *
-         * A content trigger fires once, so the pass it starts arms the next
-         * one, appended behind itself: replacing would cancel the very pass
+         * A content trigger fires once, so the work it starts arms the next
+         * one, appended behind itself: replacing would cancel the very work
          * doing the arming. Opening the app keeps whatever is armed.
          */
         internal fun watchForNewMedia(context: Context, policy: ExistingWorkPolicy) {
@@ -203,11 +215,15 @@ class BackupWorker(
          * taps, waited six hours (stratus-app#188). A pass with nothing new is
          * a listing of the roll and no request, so a few taps cost nothing.
          */
-        fun now(context: Context) {
+        fun now(context: Context) = enqueueOnce(context, Constraints.Builder().build())
+
+        private val connected = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+
+        private fun enqueueOnce(context: Context, constraints: Constraints) {
             WorkManager.getInstance(context).enqueueUniqueWork(
                 ONCE,
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
-                OneTimeWorkRequestBuilder<BackupWorker>().build(),
+                OneTimeWorkRequestBuilder<BackupWorker>().setConstraints(constraints).build(),
             )
         }
     }

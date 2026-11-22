@@ -227,6 +227,12 @@ Three things in that shape are worth keeping:
   nothing else, so a result that arrives while the phone is in a tunnel is
   still written down -- the upload already happened, and losing it because a
   client could not be built would be absurd.
+- **Only so much is handed over at once** (stratus-app#233): a handed-over
+  row is skipped, so a pass with nothing to stop it spooled the whole camera
+  roll into tmp. `HandOverBudget` -- eight files or half a gigabyte, one large
+  file always -- ends a pass as `InFlight`, and the system relaunching the app
+  to report runs a short pass that hands over the next few. A spool no live
+  task claims is swept at the start of a pass.
 - **The split falls where tus already split.** `TusTransport.append` was
   written to send everything left in one request, so the control plane is
   `begin` and `offsetOf` -- still Ktor, still shared through `TusProtocol` --

@@ -112,6 +112,33 @@ class BrowserController(
         if (timeline) openTimeline(mutable.value.months.size) else load(mutable.value.path)
     }
 
+    /**
+     * The months that held what was just deleted or renamed, listed again and
+     * put back where they were -- and nothing else (stratus-app#237). It was
+     * the whole timeline again, the floor, the years and every month loaded,
+     * one after another: forty listings for one photograph after a scroll of
+     * three years. A month left empty goes.
+     */
+    private suspend fun relist(touched: List<DavResource>) {
+        val parents = touched.map { it.path.trimEnd('/').substringBeforeLast('/') }.toSet()
+        try {
+            val months = mutable.value.months.mapNotNull { month ->
+                if (month.path.trimEnd('/') !in parents) return@mapNotNull month
+                val files = dav.list(month.path).filter { !it.isDirectory }.sortedByDescending { it.name }
+                files.takeIf { it.isNotEmpty() }?.let { TimelineMonth(month.path, it) }
+            }
+            mutable.value = mutable.value.copy(
+                months = months, entries = months.flatMap { it.entries }, busy = false, viewing = null,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: DavError) {
+            mutable.value = mutable.value.copy(busy = false, failure = BrowserFailure.Listing(e))
+        } catch (e: Exception) {
+            mutable.value = mutable.value.copy(busy = false, failure = unreachable(e))
+        }
+    }
+
     /** The years not opened yet and the months of the open one not listed yet, newest first. */
     private val yearsLeft = ArrayDeque<String>()
     private val monthsLeft = ArrayDeque<String>()
@@ -395,7 +422,7 @@ class BrowserController(
                 }
             }
             mutable.value = mutable.value.copy(selected = emptySet())
-            reload()
+            if (timeline) relist(targets) else reload()
             if (failure != null) mutable.value = mutable.value.copy(failure = failure)
         }
     }
@@ -416,7 +443,7 @@ class BrowserController(
         running = scope.launch {
             try {
                 work()
-                refresh()
+                if (timeline) relist(listOf(target)) else refresh()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: DavError) {

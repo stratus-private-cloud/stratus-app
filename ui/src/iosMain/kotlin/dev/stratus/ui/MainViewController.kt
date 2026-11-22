@@ -32,6 +32,7 @@ fun MainViewController() = ComposeUIViewController {
                 scope.launch { (container.assets as? IosAssetSource)?.request() }
             }
         },
+        shortcuts = iosShortcuts,
     )
 }
 

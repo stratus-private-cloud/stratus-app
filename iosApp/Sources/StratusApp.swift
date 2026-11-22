@@ -47,6 +47,41 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // finished transfer back in the queue (stratus-app#234).
         AppContainerFactoryKt.uploadsForEvents(delivered: { completionHandler() })
     }
+
+    /// A scene delegate of our own, which is where iOS hands over a home
+    /// screen quick action (stratus-app#199). SwiftUI still makes the window.
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
+    }
+}
+
+/// The part a quick action was picked for, handed to Kotlin both ways it can
+/// arrive: with the scene at launch, and to a scene that is already running.
+class SceneDelegate: NSObject, UIWindowSceneDelegate {
+    func scene(
+        _ scene: UIScene,
+        willConnectTo session: UISceneSession,
+        options connectionOptions: UIScene.ConnectionOptions
+    ) {
+        if let item = connectionOptions.shortcutItem {
+            ShortcutsIosKt.openShortcut(type: item.type)
+        }
+    }
+
+    func windowScene(
+        _ windowScene: UIWindowScene,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        ShortcutsIosKt.openShortcut(type: shortcutItem.type)
+        completionHandler(true)
+    }
 }
 
 @main

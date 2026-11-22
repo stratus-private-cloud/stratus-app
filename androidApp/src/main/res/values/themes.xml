@@ -17,4 +17,7 @@
     -->
     <style name="Theme.Stratus" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar" />
 
+    <!-- Nothing drawn while a share is copied: a toast says where it went (stratus-app#128). -->
+    <style name="Theme.Stratus.Share" parent="@android:style/Theme.Translucent.NoTitleBar" />
+
 </resources>

@@ -74,6 +74,12 @@ class SceneDelegate: NSObject, UIWindowSceneDelegate {
         }
     }
 
+    /// The first moment a pass can send what the Share Extension left
+    /// (stratus-app#128): the extension is another process and cannot start one.
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        MainViewControllerKt.takeInShares()
+    }
+
     func windowScene(
         _ windowScene: UIWindowScene,
         performActionFor shortcutItem: UIApplicationShortcutItem,

@@ -6,6 +6,7 @@ import dev.stratus.core.backup.IosAssetSource
 import dev.stratus.core.backup.IosPickedFiles
 import dev.stratus.core.session.Ask
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import dev.stratus.core.hostAppContainer
 import kotlinx.coroutines.runBlocking
@@ -54,4 +55,16 @@ private val container by lazy {
         // keychain read, which is what blocking here costs.
         if (runBlocking { it.reporting.granted() }) CrashReports.start()
     }
+}
+
+/**
+ * Opening the app sends what the Share Extension left behind (stratus-app#128),
+ * from Swift each time a scene becomes active: the extension cannot start a
+ * pass, so this is the first moment one can. Only when a share is waiting,
+ * since a pass also looks at the camera roll.
+ */
+@Suppress("unused") // Called from Swift.
+fun takeInShares() {
+    if ((container.picked as? IosPickedFiles)?.hasShares() != true) return
+    MainScope().launch { container.backup.pass() }
 }

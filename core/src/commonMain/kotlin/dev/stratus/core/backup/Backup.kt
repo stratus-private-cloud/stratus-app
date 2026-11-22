@@ -168,6 +168,8 @@ class Backup(
 
     private suspend fun onePass(keepGoing: () -> Boolean, onStep: (QueueStep) -> Unit): PassOutcome {
         liveTransfers?.let { live -> reconcile(live()) }
+        // Inside the lock, so two passes cannot take in one share twice.
+        picked?.shared()?.takeIf { it.isNotEmpty() }?.let { share(it) }
         if (!keepGoing()) return PassOutcome.Finished
         // One queue for both halves of the pass, so the transport is
         // negotiated once whichever of them needs it first.
@@ -316,6 +318,24 @@ class Backup(
      */
     suspend fun uploadByHand(folder: String, files: List<PickedFile>): List<String> =
         database.pending().enqueueByHand(folder, files, now())
+
+    /**
+     * Queues what the share sheet handed over into the shares' folder of the
+     * month (stratus-app#128). Nothing at all is a share that was not a file;
+     * with nobody signed in, what was kept for it is let go of.
+     */
+    suspend fun share(files: List<PickedFile>): ShareOutcome {
+        if (files.isEmpty()) return ShareOutcome.NotAFile
+        val server = instances.instance()
+        if (server == null) {
+            files.forEach { picked?.forget(it.id) }
+            return ShareOutcome.SignedOut
+        }
+        val at = now()
+        val folder = shareFolder(server.backupRoot, at)
+        uploadByHand(folder, files.map { it.copy(name = sharedName(it.name, it.contentType, at)) })
+        return ShareOutcome.Queued(folder, files.size)
+    }
 
     /** Every hand upload not yet finished, given up on or not. */
     suspend fun handUploads(): List<PendingUpload> = database.pending().all(Origin.Picked)

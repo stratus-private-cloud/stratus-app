@@ -11,6 +11,7 @@ import kotlin.random.Random
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * What a picked file is read as (stratus-app#127), against a real provider:
@@ -62,5 +63,25 @@ class AndroidPickedFilesTest {
 
         // Nothing was granted to release, which must be a shrug.
         files.forget(picked.id)
+    }
+
+    @Test
+    fun aShareIsCopiedSoItOutlivesTheGrantAndIsDeletedWhenForgotten() = runTest {
+        // stratus-app#128: an ACTION_SEND grant ends with the activity, so the
+        // id must not be the sender's URI.
+        val bytes = ByteArray(200_000) { (it % 241).toByte() }
+        val name = "shared${Random.nextInt(100_000)}.pdf"
+        val uri = download(name, bytes)
+
+        val kept = files.keep(listOf(uri)).single()
+        resolver.delete(uri, null, null)
+        assertEquals(name, kept.name)
+        assertEquals(bytes.size.toLong(), kept.size)
+
+        val rest = files.open(kept.id, 99_999).buffered().use { it.readByteArray() }
+        assertEquals(bytes.copyOfRange(99_999, bytes.size).toList(), rest.toList())
+
+        files.forget(kept.id)
+        assertFailsWith<Exception> { files.open(kept.id, 0) }
     }
 }

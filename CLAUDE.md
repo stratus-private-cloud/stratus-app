@@ -484,6 +484,24 @@ Three surfaces, and no more than three:
    tried and is null once settled. Progress shows as a row in that folder and
    not on the backup screen, whose counts are filtered to the camera roll.
 
+   **And the share sheet is a third door onto the same queue**
+   (stratus-app#128), decided as the web's `POST /share-target` is
+   (stratus-backend#312) because a share carries no destination either:
+   `Backup.share` puts it in `shared/<year>/<month>/` beside `backupRoot`'s
+   folder -- `files/shared/` on a Stratus, the web's own -- never replaces,
+   and names a nameless one by the moment and the type, the server's
+   `shareExt` copied entry for entry (`Shares.kt`). A hand upload asks for its
+   folder to be made now, once a pass, since a share's month may not exist;
+   never one a single segment deep, which on a Stratus is `files/` itself.
+   Android copies the bytes into the app's files before queueing, because an
+   `ACTION_SEND` grant ends with the activity and the row has to outlive it.
+   **iOS cannot hand anything to the app from a Share Extension**, which is
+   another process: it copies into the App Group, a folder per share renamed
+   from `.part` when whole, and `PickedFiles.shared` takes it in at the start
+   of the next pass -- which opening the app starts. The background
+   `URLSession` from inside the extension that the issue sketched was left
+   out: a second way out for bytes, in a process nothing here can test.
+
    **Several can be deleted at once** (stratus-app#210): holding a row or a
    tile ticks it, as in any Android file manager, and the bar becomes the
    selection's. It is one `DELETE` per file and never anything batched,

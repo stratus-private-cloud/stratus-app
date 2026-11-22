@@ -74,6 +74,22 @@ as a row saying why, until you take it away with its ×. On a Stratus it is
 offered in Files and not in Photos, Music or Videos, which the server makes
 itself and nothing can be put into.
 
+## Sharing to Stratus
+
+**Stratus is in the system's share sheet**: share photographs, a PDF, any file
+from another app and it is uploaded, the way the web UI's share target does it
+on a Stratus. Nothing is asked: it lands in `shared/<year>/<month>/` beside the
+backup's folder — `files/shared/` on a Stratus, the same folder the web writes
+to — the month made on the way. A taken name lands beside it as `(2)`, and a
+share that brought no name is called after the moment it arrived,
+`2026-11-22 18-04-31.jpg`. Text and links are not files and are refused.
+
+On Android a line says where it went and it is sent at once, with the app
+closed. **On iOS it is sent the next time Stratus opens**, or on its next
+background pass: the share sheet runs in a process of its own that can only
+leave the file for the app, and the App Group that carries it needs a signed
+build, so none of it has run on a phone yet.
+
 ## Platform reality
 
 Worth knowing before judging the app for it:

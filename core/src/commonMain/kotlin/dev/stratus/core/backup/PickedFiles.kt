@@ -51,6 +51,14 @@ interface PickedFiles {
 
     /** Lets go of [id] once nothing will read it again: the grant on Android, the copy on iOS. */
     suspend fun forget(id: String) {}
+
+    /**
+     * What the share sheet left for the app to take in, already moved where
+     * [open] reads it (stratus-app#128). Only iOS has any: its Share
+     * Extension is another process, so it leaves the files in the App Group
+     * and the next pass queues them. Android's share arrives in this process.
+     */
+    suspend fun shared(): List<PickedFile> = emptyList()
 }
 
 /**

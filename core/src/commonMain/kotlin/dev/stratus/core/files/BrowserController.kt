@@ -49,6 +49,9 @@ class BrowserController(
      */
     val timeline: Boolean = false,
 ) {
+    /** The originals the viewer has downloaded, so swiping back is not another download (stratus-app#238). */
+    private val originals = KeptOriginals()
+
     /** Whether there is anybody to share through, which the row menu asks. */
     val canShare: Boolean get() = sharing?.offered == true
 
@@ -101,6 +104,8 @@ class BrowserController(
 
     private fun go(path: String) {
         running?.cancel()
+        // What the viewer kept belongs to where it was looking.
+        if (path != mutable.value.path) scope.launch { originals.clear() }
         mutable.value = mutable.value.copy(
             path = path, busy = true, failure = null, pending = null, viewing = null, selected = emptySet(),
         )
@@ -278,13 +283,15 @@ class BrowserController(
      */
     suspend fun original(entry: DavResource): Original {
         if ((entry.size ?: 0) > LARGEST_ORIGINAL) return Original.TooLarge
+        val key = "${entry.path} ${entry.etag.orEmpty()}"
+        originals.get(key)?.let { return Original.Bytes(it) }
         return try {
             dav.read(entry.path) { channel ->
                 // One byte over the ceiling is how a server that reported no
                 // size, or the wrong one, is caught without reading the rest.
                 val bytes = channel.readRemaining(LARGEST_ORIGINAL + 1).readByteArray()
                 if (bytes.size > LARGEST_ORIGINAL) Original.TooLarge else Original.Bytes(bytes)
-            }
+            }.also { if (it is Original.Bytes) originals.put(key, it.bytes) }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

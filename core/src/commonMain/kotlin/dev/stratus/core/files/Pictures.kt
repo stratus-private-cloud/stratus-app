@@ -1,5 +1,7 @@
 package dev.stratus.core.files
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import dev.stratus.core.dav.DavResource
 
 /**
@@ -44,3 +46,41 @@ private val PICTURE_TYPES = setOf(
     "image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif", "image/avif", "image/bmp",
 )
 private val PICTURE_EXTENSIONS = setOf("jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "bmp")
+
+/**
+ * The last originals the viewer downloaded, kept so that swiping back is not a
+ * second download of the same sixty megabytes (stratus-app#238). Bounded in
+ * bytes rather than in pictures, since one original is a megabyte and another
+ * is fifty; keyed by the ETag as well as the path, so a file changed on the
+ * server is fetched again.
+ */
+class KeptOriginals(private val most: Long = KEPT_ORIGINALS) {
+    private val lock = Mutex()
+    private val kept = LinkedHashMap<String, ByteArray>()
+    private var bytes = 0L
+
+    suspend fun get(key: String): ByteArray? = lock.withLock {
+        kept.remove(key)?.also { kept[key] = it }
+    }
+
+    suspend fun put(key: String, value: ByteArray) = lock.withLock {
+        kept.remove(key)?.let { bytes -= it.size }
+        kept[key] = value
+        bytes += value.size
+        val oldest = kept.keys.iterator()
+        while (bytes > most && oldest.hasNext()) {
+            val key2 = oldest.next()
+            if (key2 == key) break
+            bytes -= kept.getValue(key2).size
+            oldest.remove()
+        }
+    }
+
+    suspend fun clear() = lock.withLock {
+        kept.clear()
+        bytes = 0
+    }
+}
+
+/** Twice the largest original the viewer will hold, so the one either side survives. */
+const val KEPT_ORIGINALS = 2 * LARGEST_ORIGINAL

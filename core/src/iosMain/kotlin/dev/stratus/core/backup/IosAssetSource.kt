@@ -1,7 +1,9 @@
 package dev.stratus.core.backup
 
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.io.RawSource
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -96,7 +98,15 @@ class IosAssetSource : AssetSource {
      * The user library -- what the Photos app calls Recents -- comes first and
      * is the one almost everybody wants; the albums somebody made follow.
      */
-    override suspend fun sources(): List<MediaSource> {
+    // Off the main thread, both: below iOS 26 there is no bound to ask PhotoKit
+    // for, so a pass reads the whole library, and "Back up now" is a tap on a
+    // screen (stratus-app#236). PhotoKit takes fetches from any thread.
+    override suspend fun sources(): List<MediaSource> = withContext(Dispatchers.Default) { sourcesHere() }
+
+    override suspend fun assets(from: Set<String>, addedAfterEpochMs: Long): List<Asset> =
+        withContext(Dispatchers.Default) { assetsHere(from, addedAfterEpochMs) }
+
+    private suspend fun sourcesHere(): List<MediaSource> {
         val found = mutableListOf<MediaSource>()
         for (collection in collections()) {
             val count = PHAsset.fetchAssetsInAssetCollection(collection, mediaOnly()).count.toInt()
@@ -110,7 +120,7 @@ class IosAssetSource : AssetSource {
         return found
     }
 
-    override suspend fun assets(from: Set<String>, addedAfterEpochMs: Long): List<Asset> {
+    private suspend fun assetsHere(from: Set<String>, addedAfterEpochMs: Long): List<Asset> {
         // Newest taken first, which is the order a camera roll is read in.
         // Not newest *added*: that is a key iOS 26 introduced and asking an
         // older one to sort by it raises rather than degrades.

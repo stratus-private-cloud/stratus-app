@@ -3,17 +3,24 @@ package dev.stratus.ui.backup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.stratus.core.backup.AttentionReason
 import dev.stratus.core.backup.BackupState
 import dev.stratus.core.backup.PendingUpload
 import dev.stratus.core.backup.WaitingReason
+import dev.stratus.ui.ActionRow
 import dev.stratus.ui.Footnote
 import dev.stratus.ui.Glyph
 import dev.stratus.ui.NavRow
@@ -41,8 +48,11 @@ fun BackupScreen(
     onlyOnWifi: Boolean,
     onOnlyOnWifi: (Boolean) -> Unit,
     onBackUpNow: (() -> Unit)?,
+    /** Forgets what is settled and starts a pass (stratus-app#126), once confirmed. */
+    onCheckAgain: () -> Unit,
     onClose: () -> Unit,
 ) {
+    var checking by remember { mutableStateOf(false) }
     Page("Backup", onBack = onClose) {
         Column(
             Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
@@ -63,6 +73,14 @@ fun BackupScreen(
         Section("Settings") {
             NavRow(Glyph.FOLDERS, "Folders", folders(chosenFolders), onClick = onChooseFolders)
             SwitchRow(Glyph.WIFI, "Only back up on wifi", checked = onlyOnWifi, onChange = onOnlyOnWifi)
+            if (chosenFolders > 0) {
+                ActionRow(
+                    Glyph.BACKUP,
+                    "Check everything again",
+                    "Sends whatever the server is missing, from the whole library.",
+                    onClick = { checking = true },
+                )
+            }
         }
         Footnote(
             "A camera roll is the one thing on a phone big enough to matter on a " +
@@ -83,6 +101,27 @@ fun BackupScreen(
                 }
             }
         }
+    }
+
+    if (checking) {
+        AlertDialog(
+            onDismissRequest = { checking = false },
+            title = { Text("Check everything again?") },
+            // What it costs, and the one surprise in it: a photograph deleted
+            // on the server on purpose is missing there too.
+            text = {
+                Text(
+                    "Every photograph in the folders you chose is compared with the " +
+                        "server again, and whatever is not there is sent — including " +
+                        "any you deleted on the server on purpose. With a large library " +
+                        "that is a long pass.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { onCheckAgain(); checking = false }) { Text("Check again") }
+            },
+            dismissButton = { TextButton(onClick = { checking = false }) { Text("Cancel") } },
+        )
     }
 }
 

@@ -165,8 +165,30 @@ class Backup(
     private val guard = Mutex()
     private var passing = false
     private var again = false
+    private var recheck = false
+
+    /**
+     * Makes the backup reconsider everything it has decided about
+     * (stratus-app#126), for somebody who thinks the server is behind. The
+     * caller asks for a pass, which does the rest.
+     *
+     * Never under a pass that is running, which would settle again what it
+     * walked before the record was gone: that one goes round once more and
+     * forgets first.
+     */
+    suspend fun checkAgain() {
+        val now = guard.withLock {
+            if (passing) {
+                recheck = true
+                again = true
+            }
+            !passing
+        }
+        if (now) database.forgetSettled()
+    }
 
     private suspend fun onePass(keepGoing: () -> Boolean, onStep: (QueueStep) -> Unit): PassOutcome {
+        if (guard.withLock { recheck.also { recheck = false } }) database.forgetSettled()
         liveTransfers?.let { live -> reconcile(live()) }
         // Inside the lock, so two passes cannot take in one share twice.
         picked?.shared()?.takeIf { it.isNotEmpty() }?.let { share(it) }

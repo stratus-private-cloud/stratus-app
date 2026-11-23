@@ -340,6 +340,7 @@ private fun SignedIn(
             onlyOnWifi = state.server?.onlyOnWifi ?: true,
             onOnlyOnWifi = { only -> scope.launch { signedIn.setOnlyOnWifi(only) } },
             onBackUpNow = onBackUpNow,
+            onCheckAgain = { scope.launch { signedIn.checkEverythingAgain() } },
             onClose = { leave() },
         )
 

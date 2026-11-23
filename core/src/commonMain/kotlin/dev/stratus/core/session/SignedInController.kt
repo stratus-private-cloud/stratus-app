@@ -129,6 +129,16 @@ class SignedInController(
         refresh()
     }
 
+    /**
+     * "Check everything again" (stratus-app#126), confirmed: the record is
+     * forgotten and a pass started now, since the point is to find out.
+     */
+    suspend fun checkEverythingAgain() {
+        turns.withLock { backup.checkAgain() }
+        backUpNow()
+        refresh()
+    }
+
     suspend fun signOut() {
         turns.withLock { signOut.invoke() }
         refresh()

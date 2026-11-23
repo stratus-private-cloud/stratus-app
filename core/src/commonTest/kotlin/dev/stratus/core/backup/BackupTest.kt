@@ -241,6 +241,37 @@ class BackupTest {
     }
 
     @Test
+    fun checkingAgainDuringAPassWaitsForItAndThenGoesRound() = runTest {
+        // Forgetting under a running pass would be undone by it: what it walked
+        // and sent is settled again on the way out (stratus-app#126).
+        signedIn("busy")
+        held = CompletableDeferred()
+        val first = async { backup.pass() }
+        reached.await()
+
+        backup.checkAgain()
+        assertEquals(0L, database.cache().size(), "nothing was settled yet")
+        held!!.complete(Unit)
+        first.await()
+
+        // Gone round once more, forgetting first: this server lists nothing,
+        // so the photograph it was sent counts as missing and goes again.
+        assertEquals(2, methodsAt("busy").count { it == "PUT" }, "was ${methodsAt("busy")}")
+        assertEquals(1L, database.cache().size())
+    }
+
+    @Test
+    fun checkingAgainWithNothingRunningForgetsAtOnce() = runTest {
+        signedIn("idle")
+        backup.pass()
+        assertEquals(1L, database.cache().size())
+
+        backup.checkAgain()
+
+        assertEquals(0L, database.cache().size())
+    }
+
+    @Test
     fun theDatabaseIsReadyWithoutAnybodyRememberingToMigrateIt() = runTest {
         // Every accessor migrates, so the first thing that touches a fresh file
         // works -- including signing out of a server that never backed anything up.

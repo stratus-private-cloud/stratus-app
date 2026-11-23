@@ -289,6 +289,16 @@ there is no delete anywhere in it — which is to say they held by accident, and
 the first feature to add a delete would have broken either without a test
 noticing.
 
+**And there is one way back from the third, on purpose** (stratus-app#126):
+**Check everything again** on the Backup screen is
+`BackupDatabase.forgetSettled` -- the settled record and the mark, nothing
+queued -- followed by a pass, which is then a cold start over the whole
+library: it walks the server and sends what is not there. Per server and not
+per photograph, because a single file is a hand upload now (#127). Never under
+a running pass, which would settle again what it walked before the record
+went: `Backup.checkAgain` leaves it to that pass to forget at the top of its
+next round.
+
 **How far back a pass looks is a bound and never an authority.** `BackupMark`
 remembers how far into the library the last pass got, so a phone with forty
 thousand photographs stops enumerating all of them to find the three that are

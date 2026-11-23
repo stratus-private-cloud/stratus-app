@@ -173,6 +173,22 @@ class BackupDatabase(
         }
     }
 
+    /**
+     * Forgets what has been settled and how far back a pass looks, and
+     * nothing else (stratus-app#126): the next pass enumerates the whole
+     * library, walks the server as a cold start does and queues whatever it
+     * does not hold -- including what was deleted there on purpose, which is
+     * what somebody asking for this is told first.
+     */
+    suspend fun forgetSettled() {
+        ready()
+        withContext(io) {
+            for (table in listOf("settled", "marks")) {
+                connection.prepare("DELETE FROM $table").use { statement -> statement.step() }
+            }
+        }
+    }
+
     private fun version(): Int =
         connection.prepare("PRAGMA user_version").use { statement ->
             if (statement.step()) statement.getLong(0).toInt() else 0

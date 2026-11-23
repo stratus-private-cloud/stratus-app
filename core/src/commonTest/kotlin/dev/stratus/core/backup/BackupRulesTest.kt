@@ -184,4 +184,53 @@ class BackupRulesTest {
 
         assertEquals(1, roll.opened, "it read the photograph again instead of asking the server")
     }
+
+    @Test
+    fun checkingEverythingAgainSendsWhatTheServerLostOnceAndNoMore() = runTest {
+        // The one way back from rule 3, asked for by name (stratus-app#126).
+        val photo = asset(1)
+        val server = Server()
+        val roll = Roll(listOf(photo))
+        passOver(roll, server).once(instance)
+        val path = layout.pathFor(photo)
+        server.held.clear()
+        passOver(roll, server).once(instance)
+        assertEquals(listOf("PUT"), server.methodsFor(path))
+
+        database.forgetSettled()
+        passOver(roll, server).once(instance)
+        assertEquals(listOf("PUT", "PUT"), server.methodsFor(path))
+
+        passOver(roll, server).once(instance)
+        assertEquals(listOf("PUT", "PUT"), server.methodsFor(path), "it was sent a third time")
+    }
+
+    @Test
+    fun checkingEverythingAgainLooksBehindTheMark() = runTest {
+        // An old photograph is behind the bound after the first pass, so a
+        // check that forgot only the settled record would never see it.
+        val old = asset(1)
+        val server = Server()
+        val roll = Roll(listOf(old, asset(20)))
+        passOver(roll, server).once(instance)
+        server.held.remove(layout.pathFor(old))
+
+        database.forgetSettled()
+        passOver(roll, server).once(instance)
+
+        assertTrue(layout.pathFor(old) in server.held)
+    }
+
+    @Test
+    fun checkingEverythingAgainSendsNothingTheServerStillHas() = runTest {
+        val photo = asset(1)
+        val server = Server()
+        val roll = Roll(listOf(photo))
+        passOver(roll, server).once(instance)
+
+        database.forgetSettled()
+        passOver(roll, server).once(instance)
+
+        assertEquals(1, roll.opened, "it read a photograph the walk had found on the server")
+    }
 }

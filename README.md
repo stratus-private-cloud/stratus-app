@@ -124,7 +124,12 @@ Worth knowing before judging the app for it:
   delete on the server also stays deleted: the next pass will not put it back.
   The one exception is reinstalling the app, which throws away what it knew; it
   then asks the server what it already holds rather than re-uploading
-  everything, but anything deleted before that comes back once.
+  everything, but anything deleted before that comes back once. **Check
+  everything again**, on the Backup screen, does the same on purpose: it
+  forgets what was decided, compares the whole library with the server and
+  sends whatever is missing there — the way back for a photograph deleted on
+  the server by mistake, and it asks first, since that includes the ones
+  deleted on purpose.
 - **A certificate nothing vouches for is a question, on both platforms.** Most
   self-hosted servers present one, so the app shows you its fingerprint and
   asks — once, for that address. What it will not do is accept it quietly:

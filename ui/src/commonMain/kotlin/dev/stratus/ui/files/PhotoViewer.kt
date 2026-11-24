@@ -109,6 +109,12 @@ internal fun PhotoViewer(viewing: Viewing, controller: BrowserController) {
                                     controller.ask(Confirmation.Share(shown))
                                 }
                             }
+                            if (!controller.trash) {
+                                ViewerAction(Glyph.DELETE, "Delete") {
+                                    menuOpen = false
+                                    controller.ask(Confirmation.Delete(shown))
+                                }
+                            }
                         }
                     }
                 }

@@ -346,7 +346,8 @@ months loaded so far; pinch or double tap to
 zoom. What it shows is **the original**, downloaded and decoded by the phone
 itself -- HEIC included -- so it works against any WebDAV server and costs a
 download per photograph rather than a thumbnail. Its menu still opens the file
-in another app, downloads it, or shares a link. Two limits: a picture over
+in another app, downloads it, shares a link or deletes it -- after asking, and
+then it shows the next one rather than closing. Two limits: a picture over
 64 MB opens in another app instead, and TIFF and camera raw files always do,
 because Android cannot read them.
 

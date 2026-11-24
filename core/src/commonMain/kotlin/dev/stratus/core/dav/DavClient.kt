@@ -54,9 +54,10 @@ class DavClient(
      * than assuming it is there still earns its keep: a server that omits it is
      * out there, and this works against both without asking which it is.
      */
-    suspend fun list(path: String): List<DavResource> {
+    suspend fun list(path: String, taken: Boolean = false): List<DavResource> {
         val self = normalise(path)
-        return propfind(path, Depth.One, collection = true).filterNot { normalise(it.path) == self }
+        return propfind(path, Depth.One, collection = true, body = if (taken) PROPS_TAKEN else PROPS)
+            .filterNot { normalise(it.path) == self }
     }
 
     /** One resource, or [DavError.NotFound]. */
@@ -82,12 +83,17 @@ class DavClient(
         throw response.toError(path)
     }
 
-    suspend fun propfind(path: String, depth: Depth, collection: Boolean = false): List<DavResource> {
+    suspend fun propfind(
+        path: String,
+        depth: Depth,
+        collection: Boolean = false,
+        body: String = PROPS,
+    ): List<DavResource> {
         val response = http.request(url(path, collection)) {
             method = PROPFIND
             header(HttpHeaders.Depth, depth.header)
             contentType(ContentType.Application.Xml)
-            setBody(PROPS)
+            setBody(body)
         }
         // 207 is the correct answer and what everything real sends. A plain 200
         // carrying a multistatus is tolerated because some servers do that and
@@ -330,5 +336,6 @@ class DavClient(
 
         /** Named rather than `allprop`, and the reason is in [MultiStatus.propfindBody]. */
         val PROPS = MultiStatus.propfindBody()
+        val PROPS_TAKEN = MultiStatus.propfindBody(taken = true)
     }
 }

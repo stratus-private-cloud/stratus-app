@@ -11,7 +11,19 @@ import dev.stratus.core.dav.DavResource
  * viewer opened rather than read as it goes, so that a listing refreshed
  * underneath cannot move the photograph somebody is looking at.
  */
-data class Viewing(val among: List<DavResource>, val at: Int)
+data class Viewing(val among: List<DavResource>, val at: Int) {
+    /**
+     * The same pictures with [gone] taken out, opened at the one that took its
+     * place -- or the one before, at the end -- and null when none is left.
+     */
+    fun without(gone: DavResource): Viewing? {
+        val removed = among.indexOfFirst { it.path == gone.path }
+        if (removed < 0) return this
+        val rest = among.filterIndexed { i, _ -> i != removed }
+        if (rest.isEmpty()) return null
+        return Viewing(rest, removed.coerceAtMost(rest.lastIndex))
+    }
+}
 
 /** What came back when a photograph was asked for in full. */
 sealed interface Original {

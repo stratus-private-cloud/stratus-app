@@ -154,6 +154,7 @@ internal object MultiStatus {
                 lastModifiedEpochMs = kept.lastModified,
                 source = kept.source?.let { pathOf(it, basePath) },
                 deletedFrom = kept.deletedFrom?.let { pathOf(it, basePath) },
+                taken = kept.taken,
             ),
             status,
         )
@@ -198,10 +199,14 @@ internal object MultiStatus {
      * `supportedlock` and `creationdate` for ten thousand entries is real work
      * done for a client that throws all of it away.
      */
-    fun propfindBody(): String = buildString {
+    fun propfindBody(taken: Boolean = false): String = buildString {
         append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")
         append("<propfind xmlns=\"DAV:\"><prop>")
         appendReads()
+        // Only where it is asked for: a Stratus answers it with a query per
+        // file under /files/, and for nothing on the timelines, which already
+        // read it to file a photograph under its month.
+        if (taken) append("<taken xmlns=\"").append(STRATUS).append("\"/>")
         append("</prop></propfind>")
     }
 
@@ -257,6 +262,10 @@ internal object MultiStatus {
             }
             if (ns == STRATUS && name == "deleted-from") {
                 props = props.copy(deletedFrom = readHref())
+                return@eachChild
+            }
+            if (ns == STRATUS && name == "taken") {
+                props = props.copy(taken = textOfElement().trim().ifEmpty { null })
                 return@eachChild
             }
             if (ns != DAV) {
@@ -350,6 +359,7 @@ internal object MultiStatus {
         val lastModified: Long? = null,
         val source: String? = null,
         val deletedFrom: String? = null,
+        val taken: String? = null,
     ) {
         fun merge(other: Props) = Props(
             isDirectory ?: other.isDirectory,
@@ -359,6 +369,7 @@ internal object MultiStatus {
             lastModified ?: other.lastModified,
             source ?: other.source,
             deletedFrom ?: other.deletedFrom,
+            taken ?: other.taken,
         )
     }
 }

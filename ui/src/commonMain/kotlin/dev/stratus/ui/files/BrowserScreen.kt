@@ -6,6 +6,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -51,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -277,7 +280,9 @@ fun BrowserScreen(
             }
         }
 
-        state.viewing?.let { PhotoViewer(it, controller) }
+        // Keyed, because the pager remembers where it was: a deletion opens a
+        // new Viewing at the photograph after it.
+        state.viewing?.let { key(it) { PhotoViewer(it, controller) } }
     }
 
     when (val pending = state.pending) {
@@ -717,7 +722,9 @@ private fun DetailsDialog(details: Confirmation.Details, controller: BrowserCont
         onDismissRequest = controller::dismiss,
         title = { Text(target.name) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // A photograph with a place, a long path and a source runs past
+            // a phone's screen, and a dialog does not scroll by itself.
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (details.looking) LinearProgressIndicator(Modifier.fillMaxWidth())
                 // Selectable, because a path and an ETag are things to copy.
                 SelectionContainer {

@@ -29,6 +29,12 @@ data class DavResource(
      * Only on a deletion, and null on every other server.
      */
     val deletedFrom: String? = null,
+    /**
+     * When a Stratus's indexer says it was taken, the camera's wall clock as
+     * `2026-11-20T14:30:22`, and only in a listing that asked for it
+     * ([DavClient.list] with `taken`). Null everywhere else.
+     */
+    val taken: String? = null,
 ) {
     val name: String get() = path.trimEnd('/').substringAfterLast('/')
 }

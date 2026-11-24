@@ -718,6 +718,41 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun aPhotographDeletedFromTheViewerLeavesItOnTheNextOne() = runTest {
+        val gone = mutableSetOf<String>()
+        val browser = controller(this) { request ->
+            if (request.method.value == "DELETE") {
+                gone += request.url.encodedPath
+                HttpStatusCode.NoContent to ""
+            } else {
+                val all = listOf("/files/a.jpg", "/files/b.jpg", "/files/c.jpg").filter { it !in gone }
+                HttpStatusCode.MultiStatus to listing(*all.map { it to false }.toTypedArray())
+            }
+        }
+        browser.start()
+        browser.settled()
+
+        browser.view(browser.state.value.entries.first { it.name == "b.jpg" })
+        browser.ask(Confirmation.Delete(browser.state.value.viewing!!.among[1]))
+        browser.confirmDelete()
+        browser.settled()
+
+        val viewing = browser.state.value.viewing!!
+        assertEquals(listOf("a.jpg", "c.jpg"), viewing.among.map { it.name })
+        assertEquals("c.jpg", viewing.among[viewing.at].name)
+
+        // The last one left closes it.
+        browser.ask(Confirmation.Delete(viewing.among[1]))
+        browser.confirmDelete()
+        browser.settled()
+        assertEquals("a.jpg", browser.state.value.viewing!!.among.single().name)
+        browser.ask(Confirmation.Delete(browser.state.value.viewing!!.among.single()))
+        browser.confirmDelete()
+        browser.settled()
+        assertNull(browser.state.value.viewing)
+    }
+
+    @Test
     fun backClosesThePhotographBeforeLeavingTheFolder() = runTest {
         val browser = controller(this, answer = listingOf("/files/photos" to true, "/files/photos/a.jpg" to false))
         browser.start()

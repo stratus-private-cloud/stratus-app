@@ -173,7 +173,7 @@ class BrowserController(
         try {
             val months = mutable.value.months.mapNotNull { month ->
                 if (month.path.trimEnd('/') !in parents) return@mapNotNull month
-                val files = dav.list(month.path).filter { !it.isDirectory }.sortedByDescending { it.name }
+                val files = newestTakenFirst(dav.list(month.path, taken = true))
                 files.takeIf { it.isNotEmpty() }?.let { TimelineMonth(month.path, it) }
             }
             mutable.value = mutable.value.copy(
@@ -265,10 +265,7 @@ class BrowserController(
                 yearsLeft.removeFirst()
                 continue
             }
-            // By name, newest first: the date a listing gives is when the file
-            // was written rather than taken, and the names a backup gives
-            // start with the moment of the photograph.
-            val files = dav.list(month).filter { !it.isDirectory }.sortedByDescending { it.name }
+            val files = newestTakenFirst(dav.list(month, taken = true))
             monthsLeft.removeFirst()
             if (files.isNotEmpty()) return TimelineMonth(month, files)
         }
@@ -401,7 +398,10 @@ class BrowserController(
     /** Deletes what [ask] last put up. Does nothing if nothing was asked about. */
     fun confirmDelete() {
         val target = (mutable.value.pending as? Confirmation.Delete)?.target ?: return
-        act(target) { dav.delete(target.path) }
+        // Deleted from the viewer, the viewer stays open on the one after it,
+        // as a phone's own gallery does, rather than dropping back to the grid.
+        val after = mutable.value.viewing?.without(target)
+        act(target, after) { dav.delete(target.path) }
     }
 
     /**
@@ -510,13 +510,16 @@ class BrowserController(
         act(target) { dav.move(target.path, destination) }
     }
 
-    private fun act(target: DavResource, work: suspend () -> Unit) {
+    private fun act(target: DavResource, viewing: Viewing? = null, work: suspend () -> Unit) {
         running?.cancel()
         mutable.value = mutable.value.copy(busy = true, pending = null, failure = null, restored = null)
         running = scope.launch {
             try {
                 work()
                 if (timeline) relist(listOf(target)) else refresh()
+                if (viewing != null && mutable.value.failure == null) {
+                    mutable.value = mutable.value.copy(viewing = viewing)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: DavError) {

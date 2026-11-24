@@ -439,9 +439,12 @@ Three surfaces, and no more than three:
    are the same, and the viewer swipes across months. The months come a
    `PROPFIND` each as the scroll reaches them, because the server refuses
    `Depth: infinity`; a collection leaves the queue only once listed, so a
-   failure leaves it next. Within a month the order is by name, since
-   `getlastmodified` is when the file was written rather than taken and a
-   backup's names begin with the moment of the photograph.
+   failure leaves it next. **Within a month the order is the web's**: the
+   month's `PROPFIND` names Stratus's `taken` as well, which the timeline
+   mounts answer for nothing, and a file is placed by it or, without one, by
+   `getlastmodified` -- the server's own `sort_at`. It was by name, which
+   agreed only for what this app's backup named; a screenshot or a photograph
+   sent from another phone landed somewhere else than in the web's gallery.
 
    **And Photos begins with the people** when the server has any
    (stratus-backend#519): `people/` listed once with the gallery, a few faces

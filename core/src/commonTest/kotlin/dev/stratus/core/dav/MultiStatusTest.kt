@@ -165,6 +165,16 @@ class MultiStatusTest {
         assertEquals(4, MultiStatus.parse(realListing, "/files/Photos").size)
     }
 
+    @Test
+    fun takenIsAskedForOnlyWhereItIsWantedAndReadWhereItComes() {
+        assertTrue("taken" !in MultiStatus.propfindBody())
+        assertTrue("<taken xmlns=\"https://github.com/C0piIot/stratus\"/>" in MultiStatus.propfindBody(taken = true))
+
+        val listing = """<?xml version="1.0" encoding="UTF-8"?>
+<D:multistatus xmlns:D="DAV:"><D:response><D:href>/photos/2024/06/a.jpg</D:href><D:propstat><D:prop><taken xmlns="https://github.com/C0piIot/stratus">2024-06-15T18:30:05</taken></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response><D:response><D:href>/photos/2024/06/b.png</D:href><D:propstat><D:prop><taken xmlns="https://github.com/C0piIot/stratus"/></D:prop><D:status>HTTP/1.1 404 Not Found</D:status></D:propstat></D:response></D:multistatus>"""
+        assertEquals(listOf("2024-06-15T18:30:05", null), MultiStatus.parse(listing, "").map { it.taken })
+    }
+
     /**
      * A file in a generated collection, as stratus-backend writes one
      * (stratus-backend#431): the property in its own namespace, the href in

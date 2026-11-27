@@ -753,6 +753,33 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun aPhotographInTheTimelineIsDeletedWhereItReallyIs() = runTest {
+        val deleted = mutableListOf<String>()
+        val month = """<D:multistatus xmlns:D="DAV:"><D:response><D:href>/photos/2026/11/a.jpg</D:href><D:propstat><D:prop><D:resourcetype/><source xmlns="https://github.com/C0piIot/stratus"><D:href>/files/Camera/a.jpg</D:href></source></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response></D:multistatus>"""
+        val tree = mapOf(
+            "/photos/" to listing("/photos/2026" to true),
+            "/photos/2026/" to listing("/photos/2026/11" to true),
+            "/photos/2026/11/" to month,
+        )
+        val browser = controller(this, floor = "/photos/", timeline = true) { request ->
+            if (request.method.value == "DELETE") {
+                deleted += request.url.encodedPath
+                HttpStatusCode.NoContent to ""
+            } else {
+                HttpStatusCode.MultiStatus to tree.getValue(request.url.encodedPath)
+            }
+        }
+        browser.start()
+        browser.settled()
+
+        browser.ask(Confirmation.Delete(browser.state.value.entries.single()))
+        browser.confirmDelete()
+        browser.settled()
+        assertEquals(listOf("/files/Camera/a.jpg"), deleted)
+        assertNull(browser.state.value.failure)
+    }
+
+    @Test
     fun backClosesThePhotographBeforeLeavingTheFolder() = runTest {
         val browser = controller(this, answer = listingOf("/files/photos" to true, "/files/photos/a.jpg" to false))
         browser.start()

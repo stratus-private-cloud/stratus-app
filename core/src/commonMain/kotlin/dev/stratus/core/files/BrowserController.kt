@@ -401,7 +401,7 @@ class BrowserController(
         // Deleted from the viewer, the viewer stays open on the one after it,
         // as a phone's own gallery does, rather than dropping back to the grid.
         val after = mutable.value.viewing?.without(target)
-        act(target, after) { dav.delete(target.path) }
+        act(target, after) { dav.delete(target.deletable) }
     }
 
     /**
@@ -462,7 +462,7 @@ class BrowserController(
             var failure: BrowserFailure? = null
             for (target in targets) {
                 try {
-                    dav.delete(target.path)
+                    dav.delete(target.deletable)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: DavError) {
@@ -591,3 +591,7 @@ suspend fun DavClient.isStratusAtOrigin(): Boolean = basePath.isEmpty() && try {
  */
 internal fun List<DavResource>.sortedForPeople(): List<DavResource> =
     sortedWith(compareByDescending<DavResource> { it.isDirectory }.thenBy { it.name.lowercase() })
+
+// A Stratus's generated collections refuse every write, so a photograph seen
+// under `photos/` is deleted where it really is (stratus-backend#431).
+private val DavResource.deletable: String get() = source ?: path

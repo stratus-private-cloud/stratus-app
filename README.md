@@ -118,6 +118,11 @@ Worth knowing before judging the app for it:
   them, and the backup screen says how much is waiting for wifi rather than
   going quiet. Turning it off starts a pass there and then instead of waiting
   for the next window.
+- **On Android the backup is also a Quick Settings tile.** Add **Stratus
+  backup** by editing the notification shade's tiles: it says what the backup
+  strip says, and tapping it starts a pass -- or opens the app, where what
+  needs you can be read, when there is no server, no photo access or files
+  that will not upload.
 - **A backup only ever adds.** Deleting a photograph on the phone does not
   delete it on the server, and deleting a file on the server does not delete it
   on the phone — nothing in the app has a way to remove either. A file you
@@ -300,8 +305,8 @@ long press, as the web app's are. Music draws an artist's albums as a grid of
 covers, and **Photos and Videos are each one scroll of thumbnails, newest first
 under a heading per month**, as the web's gallery is, rather than folders of
 years and months to walk; older months load as you reach them, one listing
-each. Within a month they are in order of name, newest first, which is the
-order of the date a backup starts its names with. **Where the server has
+each. Within a month they are in the web's order, newest first by when the
+camera says they were taken, or by when the file arrived without that. **Where the server has
 grouped the faces in them into people, Photos begins with a few of their faces
 and the word People**: a face opens that person's photographs and the rest of
 the row opens everybody, each drawn by the face the server picked, `?cover` on

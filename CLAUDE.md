@@ -1364,6 +1364,22 @@ byte under a name carrying its hash, so a name added here is one the web can
 use and a regenerated font is one to copy across. `info` is in the list for
 Details, which both have.
 
+## The tile in the shade (stratus-app#265)
+
+**The backup is a Quick Settings tile on Android**, `BackupTileService`: the
+strip's answer cut to a tile's subtitle, and a tap that starts a pass through
+the same `BackupWorker.now` the button does. What it says and what a tap does
+are `backupTile` in common code, with tests; the service holds the tile.
+
+Three things in it are the platform's. **The status is asked again every two
+seconds while the shade is open and never otherwise**, since it is a query and
+not a flow, and a tile nobody is looking at needs none. **A tap is shown as
+starting for a few seconds** whatever the status says, because WorkManager has
+not begun the pass yet and the journal still says what it said before. And
+**no tile is ever unavailable**: Android sends no click to one, and the ones
+that would be -- no server, no photo access, files that will not upload -- are
+exactly those whose tap has to open the app instead.
+
 ## The launcher icon's menu
 
 **A Stratus's parts are on the icon's long press on Android**, the shortcuts

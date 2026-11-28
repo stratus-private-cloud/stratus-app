@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The icon beside "Stratus" in the Files sidebar and in every picker. The only
-  drawables this app has are this and the launcher's two: everything else on
-  screen is Compose. It is the mark on its own 64-unit grid, tinted by the
-  sidebar rather than coloured here, so the row it sits in decides whether it
-  is light or dark.
+  The icon beside "Stratus" in the Files sidebar and in every picker, and on
+  the Quick Settings tile. The only drawables this app has are this and the
+  launcher's two: everything else on screen is Compose. It is the mark on its
+  own 64-unit grid, tinted by whatever draws it rather than coloured here, so
+  the row or the tile it sits in decides whether it is light or dark.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"

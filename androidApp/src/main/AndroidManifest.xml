@@ -70,6 +70,19 @@
             </intent-filter>
         </provider>
 
+        <!-- The backup in the notification shade (stratus-app#265). The
+             permission is what lets only the system bind to it. -->
+        <service
+            android:name=".BackupTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stratus_root"
+            android:label="Stratus backup"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- Opening a file means handing it to another app, and a file:// URI has
              been refused since Android 7. This is the grant that replaces it. -->
         <provider

@@ -1,11 +1,16 @@
 package dev.stratus.core.files
 
+import android.app.PendingIntent
 import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
+import android.service.chooser.ChooserAction
+import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -36,8 +41,9 @@ class AndroidFileHandoff(private val context: Context) : FileHandoff {
         )
     }
 
-    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
+    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit, link: suspend () -> String?) {
         val uri = cached(name, body)
+        val signed = link()
         val send = Intent(Intent.ACTION_SEND)
             .setType(contentType ?: "application/octet-stream")
             .putExtra(Intent.EXTRA_STREAM, uri)
@@ -45,9 +51,25 @@ class AndroidFileHandoff(private val context: Context) : FileHandoff {
         // The grant travels with the ClipData and not with EXTRA_STREAM, and
         // the chooser passes it on to whichever app is picked.
         send.clipData = ClipData.newRawUri(name.sanitised(), uri)
-        context.startActivity(
-            Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        val chooser = Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (signed != null && Build.VERSION.SDK_INT >= 34) {
+            chooser.putExtra(Intent.EXTRA_CHOOSER_CUSTOM_ACTIONS, arrayOf(copyLink(name.sanitised(), signed)))
+        }
+        context.startActivity(chooser)
+    }
+
+    @RequiresApi(34)
+    private fun copyLink(name: String, link: String): ChooserAction {
+        val copy = Intent(context, CopyLinkReceiver::class.java)
+            .putExtra(CopyLinkReceiver.LINK, link)
+            .putExtra(CopyLinkReceiver.NAME, name)
+        // One pending intent for every send, so UPDATE_CURRENT is what puts
+        // this file's link in it rather than the last one's.
+        val pending = PendingIntent.getBroadcast(
+            context, 0, copy, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        val icon = Icon.createWithResource(context, android.R.drawable.ic_menu_share)
+        return ChooserAction.Builder(icon, "Copy link · 1 week", pending).build()
     }
 
     /**

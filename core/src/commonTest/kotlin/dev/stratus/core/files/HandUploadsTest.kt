@@ -21,7 +21,7 @@ import kotlin.test.assertEquals
 private class NoHandoff : FileHandoff {
     override suspend fun open(name: String, contentType: String?, body: suspend (Sink) -> Unit) {}
     override suspend fun save(name: String, contentType: String?, body: suspend (Sink) -> Unit) {}
-    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit) {}
+    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit, link: suspend () -> String?) {}
 }
 
 private class Uploading : HandUploads {

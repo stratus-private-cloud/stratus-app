@@ -29,14 +29,16 @@ private class RecordingHandoff : FileHandoff {
     val opened = mutableListOf<String>()
     val saved = mutableListOf<String>()
     val sent = mutableListOf<String>()
+    val links = mutableListOf<String?>()
     override suspend fun open(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
         opened += name
     }
     override suspend fun save(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
         saved += name
     }
-    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
+    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit, link: suspend () -> String?) {
         sent += name
+        links += link()
     }
 }
 
@@ -536,6 +538,57 @@ class BrowserControllerTest {
         assertEquals(listOf("a.txt"), handoff.opened)
         assertEquals(listOf("a.txt"), handoff.saved)
         assertEquals(listOf("a.txt"), handoff.sent)
+    }
+
+    @Test
+    fun aFileIsSentWithAWeeksLinkToItBesideIt() = runTest {
+        val browser = controller(this) { request ->
+            if (request.method.value == "GET") HttpStatusCode.OK to "some bytes"
+            else HttpStatusCode.MultiStatus to listing("/files/a.txt" to false)
+        }
+        browser.start()
+        browser.settled()
+
+        browser.sendFile(browser.state.value.entries.single())
+        browser.settled()
+
+        val expected = ShareLinks("http://host/", Credentials("edu", "secret"))
+            .link("/files/a.txt", isDirectory = false, life = ShareLife.AWeek, nowEpochSeconds = 1_700_000_000)
+        assertEquals(listOf(expected), handoff.links)
+    }
+
+    @Test
+    fun aFileNoLinkCanBeSignedForIsSentAloneWithoutAskingAnything() = runTest {
+        val browser = controller(this) { request ->
+            if (request.method.value == "GET") HttpStatusCode.OK to "some bytes"
+            else HttpStatusCode.MultiStatus to listing("/playlists/mix.m3u8" to false)
+        }
+        browser.start()
+        browser.settled()
+
+        browser.sendFile(browser.state.value.entries.single())
+        browser.settled()
+
+        assertEquals(listOf("mix.m3u8"), handoff.sent)
+        assertEquals(listOf<String?>(null), handoff.links)
+        assertEquals(emptyList(), asked)
+    }
+
+    @Test
+    fun aServerThatDoesNotDoLinksGetsTheFileAlone() = runTest {
+        val browser = controller(this, links = support(HttpStatusCode.SeeOther)) { request ->
+            if (request.method.value == "GET") HttpStatusCode.OK to "some bytes"
+            else HttpStatusCode.MultiStatus to listing("/files/a.txt" to false)
+        }
+        browser.start()
+        browser.settled()
+
+        browser.sendFile(browser.state.value.entries.single())
+        browser.settled()
+
+        assertEquals(listOf("a.txt"), handoff.sent)
+        assertEquals(listOf<String?>(null), handoff.links)
+        assertNull(browser.state.value.failure, "a link nobody asked for is not a failure")
     }
 
     @Test

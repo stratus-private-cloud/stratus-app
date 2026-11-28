@@ -123,6 +123,12 @@ Worth knowing before judging the app for it:
   strip says, and tapping it starts a pass -- or opens the app, where what
   needs you can be read, when there is no server, no photo access or files
   that will not upload.
+- **And a home screen widget.** It shows the backup's state over a photograph
+  from an earlier year: one taken on this day if there is one, otherwise one
+  from this month. Tapping it opens the app. The photograph comes from a
+  Stratus's `photos/` timeline and its thumbnail, fetched once a day. Any
+  other server gets the state alone, and so does a library with nothing from
+  this month in the last ten years.
 - **A backup only ever adds.** Deleting a photograph on the phone does not
   delete it on the server, and deleting a file on the server does not delete it
   on the phone — nothing in the app has a way to remove either. A file you

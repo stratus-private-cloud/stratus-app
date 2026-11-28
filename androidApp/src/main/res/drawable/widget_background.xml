@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The launcher icon's sky, for a widget with no photograph behind it. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <corners android:radius="16dp" />
+    <gradient
+        android:angle="270"
+        android:endColor="#2C6FB5"
+        android:startColor="#5AA0EC" />
+</shape>

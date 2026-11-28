@@ -83,6 +83,22 @@
             </intent-filter>
         </service>
 
+        <!-- The home screen widget (stratus-app#266). Exported because the
+             launcher is another app; the backup's own broadcast reaches it
+             only because BackupWorker names this package. -->
+        <receiver
+            android:name=".StratusWidget"
+            android:exported="true"
+            android:label="Stratus">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="dev.stratus.action.BACKUP_PASSED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_backup" />
+        </receiver>
+
         <!-- Opening a file means handing it to another app, and a file:// URI has
              been refused since Android 7. This is the grant that replaces it. -->
         <provider

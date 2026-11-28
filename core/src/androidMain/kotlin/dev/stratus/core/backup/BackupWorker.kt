@@ -3,6 +3,7 @@ package dev.stratus.core.backup
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.provider.MediaStore
@@ -72,6 +73,9 @@ class BackupWorker(
             },
         )
 
+        // For the home screen widget, which lives in the app and redraws on it (stratus-app#266).
+        applicationContext.sendBroadcast(Intent(PASSED).setPackage(applicationContext.packageName))
+
         // Coming back later is WorkManager's job; whether there is a reason to
         // is the queue's, and which item is ready is the queue's too. The two
         // backoffs are about different things and do not fight.
@@ -140,6 +144,8 @@ class BackupWorker(
         private const val PERIODIC = "stratus-backup"
         /** Public for the end-to-end suite, which waits on the pass it asked for. */
         const val ONCE = "stratus-backup-now"
+        /** Sent to this app alone when a pass ends, whatever it ended with. */
+        const val PASSED = "dev.stratus.action.BACKUP_PASSED"
         private const val ON_WIFI = "stratus-backup-on-wifi"
         /** Internal for the device test, which looks for it re-armed. */
         internal const val NEW_MEDIA = "stratus-backup-on-new-media"

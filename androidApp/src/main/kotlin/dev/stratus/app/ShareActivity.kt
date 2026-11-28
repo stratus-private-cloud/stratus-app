@@ -12,6 +12,7 @@ import dev.stratus.core.appContainer
 import dev.stratus.core.backup.AndroidPickedFiles
 import dev.stratus.core.backup.BackupWorker
 import dev.stratus.core.backup.ShareOutcome
+import dev.stratus.core.backup.ShareTargets
 import kotlinx.coroutines.launch
 
 /**
@@ -29,7 +30,8 @@ class ShareActivity : ComponentActivity() {
         val uris = streamsOf(intent)
         lifecycleScope.launch {
             val files = AndroidPickedFiles(applicationContext).keep(uris)
-            val outcome = appContainer(applicationContext).backup.share(files)
+            val into = ShareTargets.folderOf(intent.getStringExtra(Intent.EXTRA_SHORTCUT_ID))
+            val outcome = appContainer(applicationContext).backup.share(files, into)
             if (outcome is ShareOutcome.Queued) BackupWorker.now(applicationContext)
             Toast.makeText(applicationContext, said(outcome), Toast.LENGTH_LONG).show()
             setResult(Activity.RESULT_OK)

@@ -75,6 +75,8 @@ class AppContainer(
      * locations of its own -- Android's Files app does (stratus-app#104).
      */
     serversChanged: suspend () -> Unit = {},
+    /** The folders a share can be sent straight into, whenever they change (stratus-app#269). */
+    private val foldersChanged: suspend (List<String>) -> Unit = {},
     /** See [Backup]'s own parameter: the one thing a platform answers differently. */
     private val transports: (suspend (Connection, Server) -> Transport)? = null,
     private val liveTransfers: (suspend () -> Set<String>)? = null,
@@ -120,9 +122,12 @@ class AppContainer(
 
     val backup: Backup by lazy {
         if (transports == null) {
-            Backup(instances, database, assets, connections, network = network, picked = picked)
+            Backup(instances, database, assets, connections, network = network, picked = picked, foldersChanged = foldersChanged)
         } else {
-            Backup(instances, database, assets, connections, transports, liveTransfers, network, handOverAtMost, picked)
+            Backup(
+                instances, database, assets, connections, transports, liveTransfers, network, handOverAtMost, picked,
+                foldersChanged = foldersChanged,
+            )
         }
     }
 
@@ -163,6 +168,7 @@ class AppContainer(
         database.clear()
         connections.clear()
         links = null
+        foldersChanged(emptyList())
     }
 
     /**

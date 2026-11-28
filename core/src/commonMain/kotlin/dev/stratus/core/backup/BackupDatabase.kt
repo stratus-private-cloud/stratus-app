@@ -60,6 +60,11 @@ class BackupDatabase(
         return BackupMark(connection, io)
     }
 
+    suspend fun recentFolders(): RecentFolders {
+        ready()
+        return RecentFolders(connection, io)
+    }
+
     /**
      * Writes the schema, throwing away anything older.
      *
@@ -72,7 +77,7 @@ class BackupDatabase(
      * is a pass away from being queued again. So an older file is dropped.
      *
      * The rule from here is the ordinary one: a migration is added, never
-     * edited, and the next number is 9.
+     * edited, and the next number is 10.
      */
     suspend fun migrate() = withContext(io) {
         if (version() < 7) rewrite()
@@ -84,10 +89,14 @@ class BackupDatabase(
             connection.execSQL("ALTER TABLE pending ADD COLUMN numbered INTEGER")
             connection.execSQL("PRAGMA user_version = 8")
         }
+        if (version() < 9) {
+            connection.execSQL("CREATE TABLE recent_folders (path TEXT PRIMARY KEY, used_at INTEGER NOT NULL)")
+            connection.execSQL("PRAGMA user_version = 9")
+        }
     }
 
     private fun rewrite() {
-        for (table in listOf("uploaded", "settled", "pending", "journal", "marks")) {
+        for (table in listOf("uploaded", "settled", "pending", "journal", "marks", "recent_folders")) {
             connection.execSQL("DROP TABLE IF EXISTS $table")
         }
 
@@ -167,7 +176,7 @@ class BackupDatabase(
     suspend fun clear() {
         ready()
         withContext(io) {
-            for (table in listOf("settled", "pending", "journal", "marks")) {
+            for (table in listOf("settled", "pending", "journal", "marks", "recent_folders")) {
                 connection.prepare("DELETE FROM $table").use { statement -> statement.step() }
             }
         }

@@ -325,7 +325,12 @@ class HandUploadTest {
     }
 
     private val roll = WatchedRoll()
-    private val backup = Backup(instances, database, roll, connections, picked = picks, now = { pickedAt })
+    private var clock = pickedAt
+    private val told = mutableListOf<List<String>>()
+    private val backup = Backup(
+        instances, database, roll, connections, picked = picks, now = { clock },
+        foldersChanged = { told += it },
+    )
 
     private suspend fun signedIn(sources: Set<String> = emptySet()) {
         instances.put(Server("https://host/", "edu", sources = sources), Credentials("edu", "secret"))
@@ -427,6 +432,61 @@ class HandUploadTest {
     fun aShareOfNoFileIsNotAFile() = runTest {
         signedIn()
         assertEquals(ShareOutcome.NotAFile, backup.share(emptyList()))
+    }
+
+    // ---- Straight into a recent folder (stratus-app#269) ---------------------
+
+    @Test
+    fun theFoldersSomethingWasPutIntoAreRecentNewestFirstAndFourAtMost() = runTest {
+        signedIn()
+        for (folder in listOf("/files/a/", "/files/b/", "/files/c/", "/files/d/", "/files/e/", "/files/b/")) {
+            clock += 1_000
+            backup.uploadByHand(folder, listOf(scan))
+        }
+
+        val recent = listOf("files/b", "files/e", "files/d", "files/c")
+        assertEquals(recent, backup.recentFolders())
+        assertEquals(recent, told.last(), "the platform was not told")
+    }
+
+    @Test
+    fun aShareToTheMonthsFolderDoesNotMakeItRecent() = runTest {
+        signedIn()
+        backup.share(listOf(scan))
+        assertEquals(emptyList(), backup.recentFolders())
+    }
+
+    @Test
+    fun aShareIntoARecentFolderLandsThereNumberedAndKeepsItRecent() = runTest {
+        signedIn()
+        backup.uploadByHand("/files/docs/", listOf(scan))
+        backup.pass()
+        clock += 1_000
+        backup.uploadByHand("/files/other/", listOf(PickedFile("content://x", "x.txt", 1, "text/plain")))
+        clock += 1_000
+
+        assertEquals(ShareOutcome.Queued("files/docs", 1), backup.share(listOf(scan), into = "files/docs"))
+        backup.pass()
+
+        assertTrue("/files/docs/scan (2).pdf" in puts(), "was ${puts()}")
+        assertEquals("files/docs", backup.recentFolders().first())
+    }
+
+    @Test
+    fun aShareIntoAFolderThatIsNotRecentGoesToTheMonthInstead() = runTest {
+        signedIn()
+        assertEquals(
+            ShareOutcome.Queued("files/shared/2026/10", 1),
+            backup.share(listOf(scan), into = "files/somebody-elses"),
+        )
+    }
+
+    @Test
+    fun signingOutForgetsTheRecentFolders() = runTest {
+        signedIn()
+        backup.uploadByHand("/files/docs/", listOf(scan))
+        database.clear()
+        assertEquals(emptyList(), backup.recentFolders())
     }
 
     @Test

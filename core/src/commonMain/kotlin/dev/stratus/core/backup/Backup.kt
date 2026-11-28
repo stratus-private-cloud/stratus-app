@@ -89,6 +89,8 @@ class Backup(
     /** Where files picked by hand are read from (stratus-app#127), or null where nothing can pick one. */
     private val picked: PickedFiles? = null,
     private val now: () -> Long = { getTimeMillis() },
+    /** Told [recentFolders] whenever they change, so the platform can offer them to the share sheet. */
+    private val foldersChanged: suspend (List<String>) -> Unit = {},
 ) {
     private val sent = MutableStateFlow<Map<String, Long>>(emptyMap())
 
@@ -338,15 +340,28 @@ class Backup(
      * caller asks for, since only the platform can start one that outlives
      * the screen (stratus-app#127).
      */
-    suspend fun uploadByHand(folder: String, files: List<PickedFile>): List<String> =
-        database.pending().enqueueByHand(folder, files, now())
+    suspend fun uploadByHand(folder: String, files: List<PickedFile>): List<String> {
+        val at = now()
+        val queued = database.pending().enqueueByHand(folder, files, at)
+        val recent = database.recentFolders()
+        recent.used(folder, at)
+        foldersChanged(recent.list())
+        return queued
+    }
+
+    /** Where something was last put by hand, newest first and at most four (stratus-app#269). */
+    suspend fun recentFolders(): List<String> = database.recentFolders().list()
 
     /**
      * Queues what the share sheet handed over into the shares' folder of the
      * month (stratus-app#128). Nothing at all is a share that was not a file;
      * with nobody signed in, what was kept for it is let go of.
+     *
+     * [into] is one of [recentFolders], picked in the sheet (stratus-app#269),
+     * and makes it recent again. One that is not among them any more -- a
+     * shortcut the system kept after signing out -- is the default instead.
      */
-    suspend fun share(files: List<PickedFile>): ShareOutcome {
+    suspend fun share(files: List<PickedFile>, into: String? = null): ShareOutcome {
         if (files.isEmpty()) return ShareOutcome.NotAFile
         val server = instances.instance()
         if (server == null) {
@@ -354,8 +369,10 @@ class Backup(
             return ShareOutcome.SignedOut
         }
         val at = now()
-        val folder = shareFolder(server.backupRoot, at)
-        uploadByHand(folder, files.map { it.copy(name = sharedName(it.name, it.contentType, at)) })
+        val chosen = into?.trim('/')?.takeIf { it in recentFolders() }
+        val folder = chosen ?: shareFolder(server.backupRoot, at)
+        val named = files.map { it.copy(name = sharedName(it.name, it.contentType, at)) }
+        if (chosen != null) uploadByHand(folder, named) else database.pending().enqueueByHand(folder, named, at)
         return ShareOutcome.Queued(folder, files.size)
     }
 

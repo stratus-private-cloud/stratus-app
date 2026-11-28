@@ -376,6 +376,18 @@ iOS a certificate only this phone vouches for is refused**, because the system's
 player fetches with the system's trust and not the app's, and plays are not
 counted on the server yet.
 
+**On Android the same library is in Android Auto, on a watch and in the
+Assistant.**
+- **Where it appears:** a car's screen and a watch browse it the way they
+  browse any music app. On a Stratus that is the artists, their albums and the
+  playlists; any other server is browsed as plain folders.
+- **What plays:** choosing a track plays its album from there, or its playlist
+  if that is where it was chosen.
+- **By voice:** "play *something* on Stratus" plays what the server's search
+  finds by that word, on a server that has search.
+
+Nothing has to be set up for any of it; the phone needs only to be signed in.
+
 ## Watching a film
 
 In 🎬 Videos, tapping a recording plays it full screen; anywhere else, a film's

@@ -50,7 +50,7 @@ class AndroidPlayer(context: Context) : Player {
     override fun play(queue: List<Track>, start: Int, trust: TrustPolicy) {
         PlaybackTrust.policy = trust
         withController { c ->
-            c.setMediaItems(queue.map(::itemOf), start, 0L)
+            c.setMediaItems(queue.map(::mediaItemOf), start, 0L)
             c.prepare()
             c.play()
         }
@@ -102,19 +102,6 @@ class AndroidPlayer(context: Context) : Player {
         else -> error.errorCodeName
     }
 
-    private fun itemOf(track: Track): MediaItem = MediaItem.Builder()
-        .setMediaId(track.url)
-        .setUri(Uri.parse(track.url))
-        .setMediaMetadata(
-            MediaMetadata.Builder()
-                .setTitle(track.title)
-                .setAlbumTitle(track.album)
-                .setArtist(track.artist)
-                .apply { track.artwork?.let { setArtworkData(it, MediaMetadata.PICTURE_TYPE_FRONT_COVER) } }
-                .build(),
-        )
-        .build()
-
     private fun trackOf(item: MediaItem) = Track(
         url = item.mediaId,
         title = item.mediaMetadata.title?.toString().orEmpty(),
@@ -122,3 +109,19 @@ class AndroidPlayer(context: Context) : Player {
         artist = item.mediaMetadata.artist?.toString(),
     )
 }
+
+/** A track as the session plays it: the signed link is its id as well as its address. */
+internal fun mediaItemOf(track: Track): MediaItem = MediaItem.Builder()
+    .setMediaId(track.url)
+    .setUri(Uri.parse(track.url))
+    .setMediaMetadata(
+        MediaMetadata.Builder()
+            .setTitle(track.title)
+            .setAlbumTitle(track.album)
+            .setArtist(track.artist)
+            .setIsBrowsable(false)
+            .setIsPlayable(true)
+            .apply { track.artwork?.let { setArtworkData(it, MediaMetadata.PICTURE_TYPE_FRONT_COVER) } }
+            .build(),
+    )
+    .build()

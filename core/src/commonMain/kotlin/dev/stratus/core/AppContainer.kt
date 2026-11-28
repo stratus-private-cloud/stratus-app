@@ -20,9 +20,11 @@ import dev.stratus.core.documents.DocumentRef
 import dev.stratus.core.documents.DocumentTree
 import dev.stratus.core.files.BrowserController
 import dev.stratus.core.play.MusicController
+import dev.stratus.core.play.MusicLibrary
 import dev.stratus.core.play.Player
 import dev.stratus.core.play.VideoController
 import dev.stratus.core.play.VideoScreen
+import io.ktor.util.date.getTimeMillis
 import dev.stratus.core.files.isStratusAtOrigin
 import dev.stratus.core.files.FileHandoff
 import dev.stratus.core.files.QueuedHandUploads
@@ -210,6 +212,25 @@ class AppContainer(
             trust = TrustPolicy(trust.pins()[hostPortOf(instance.baseUrl)]),
             scope = scope,
         )
+    }
+
+    /**
+     * The music as a tree for a car, a watch and the Assistant
+     * (stratus-app#267), with the trust the player needs to fetch from it.
+     * Null when nobody is signed in.
+     */
+    suspend fun musicLibrary(): Pair<MusicLibrary, TrustPolicy>? {
+        val instance = instances.instance() ?: return null
+        val credentials = instances.credentials() ?: return null
+        val connection = connections.to(instance) ?: return null
+        val library = MusicLibrary(
+            connection.dav,
+            ShareLinks(instance.baseUrl, credentials),
+            cover = { album -> thumbnails.cover(album, COVER_PIXELS) },
+            stratus = connection.dav.isStratusAtOrigin(),
+            now = { getTimeMillis() / 1000 },
+        )
+        return library to TrustPolicy(trust.pins()[hostPortOf(instance.baseUrl)])
     }
 
     /** Playing films in the app, or null where this platform cannot or nobody is signed in. */

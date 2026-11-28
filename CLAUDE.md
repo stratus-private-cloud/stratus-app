@@ -1380,6 +1380,24 @@ not begun the pass yet and the journal still says what it said before. And
 that would be -- no server, no photo access, files that will not upload -- are
 exactly those whose tap has to open the app instead.
 
+## The widget on the home screen (stratus-app#266)
+
+**`StratusWidget` is RemoteViews and not Glance**: one text and one picture
+did not justify another library. What it shows is the tile's subtitle over
+`memoryOn`, which runs in common code with tests. It lists `photos/` and each
+earlier year's month, prefers a photograph whose `taken` falls on this day,
+and picks one by a seed that is the date, so it stays the same all day. On any
+other server `photos/` is an error, and the photograph is simply not there.
+
+Two things in it belong to the platform. **A broadcast has seconds**, so a
+redraw uses only what is kept on the phone, and the photograph is fetched by a
+worker once a day. That fetch costs about a dozen listings and a thumbnail. A
+pass ends with a broadcast that names this package, and that broadcast is
+what redraws the state. **A fetch that failed waits an hour before it is
+asked for again.** WorkManager switches its own receivers on and off, the
+launcher answers that package change with an update, and so a failure
+retried on every update would loop.
+
 ## The launcher icon's menu
 
 **A Stratus's parts are on the icon's long press on Android**, the shortcuts

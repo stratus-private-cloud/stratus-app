@@ -27,7 +27,9 @@ import dev.stratus.core.files.isStratusAtOrigin
 import dev.stratus.core.files.FileHandoff
 import dev.stratus.core.files.QueuedHandUploads
 import dev.stratus.core.files.SearchController
+import dev.stratus.core.media.Memory
 import dev.stratus.core.media.Thumbnails
+import dev.stratus.core.media.memoryOn
 import dev.stratus.core.server.Server
 import dev.stratus.core.server.ServerStore
 import dev.stratus.core.net.DavProber
@@ -280,6 +282,13 @@ class AppContainer(
             uploads = picked?.let { QueuedHandUploads(backup) },
             trash = trash,
         )
+    }
+
+    /** Today's photograph from an earlier year, for the home screen widget (stratus-app#266). */
+    suspend fun memory(year: Int, month: Int, day: Int): Memory? {
+        val instance = instances.instance() ?: return null
+        val connection = connections.to(instance) ?: return null
+        return memoryOn(connection.dav, year, month, day)
     }
 
     /** Finding a file by a word of its name, where the server has the method. */

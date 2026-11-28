@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The widget picker's line, which only a resource can be. -->
+    <string name="widget_description">Your backup, and a photograph from this day in an earlier year</string>
+</resources>

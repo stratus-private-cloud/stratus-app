@@ -124,4 +124,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.kotlinx.coroutines.core)
+    // Already in the app through :core; named for the widget's daily fetch.
+    implementation(libs.androidx.work)
 }

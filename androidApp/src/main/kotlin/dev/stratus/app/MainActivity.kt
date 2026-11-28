@@ -165,7 +165,9 @@ class MainActivity : ComponentActivity() {
                 .setIntent(Intent(Intent.ACTION_VIEW, null, this, MainActivity::class.java).putExtra(PART, section.id))
                 .build()
         }
-        manager.dynamicShortcuts = shortcuts
+        // Only the parts: the recent folders are dynamic shortcuts too (stratus-app#269).
+        manager.removeDynamicShortcuts((SHORTCUT_ICONS.keys - sections.map { it.id }.toSet()).toList())
+        manager.addDynamicShortcuts(shortcuts)
     }
 
     private companion object {

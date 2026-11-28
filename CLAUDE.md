@@ -524,6 +524,16 @@ Three surfaces, and no more than three:
    `URLSession` from inside the extension that the issue sketched was left
    out: a second way out for bytes, in a process nothing here can test.
 
+   **And a share can name its folder after all** (stratus-app#269): the four
+   folders last uploaded into by hand are `RecentFolders`, a table cleared on
+   sign-out, and Android publishes them as sharing shortcuts, the row a chat
+   app fills with conversations. A share through one is `Backup.share` with
+   `into`, honoured only while that folder is still recent, since the
+   system can keep a shortcut longer than this app does. The month's folder
+   never becomes recent: it changes every month and is the default anyway.
+   Android 13 and later only, because before it a dynamic shortcut cannot
+   be kept off the launcher menu that holds a Stratus's parts.
+
    **Several can be deleted at once** (stratus-app#210): holding a row or a
    tile ticks it, as in any Android file manager, and the bar becomes the
    selection's. It is one `DELETE` per file and never anything batched,

@@ -90,6 +90,13 @@ background pass: the share sheet runs in a process of its own that can only
 leave the file for the app, and the App Group that carries it needs a signed
 build, so none of it has run on a phone yet.
 
+**On Android 13 and later the sheet also offers your recent folders**: the last
+four you put something into by hand, by Upload or through one of these, appear
+in the row of suggestions at the top of the sheet, as a chat app's recent
+conversations do, and a share sent there lands in that folder instead. Android
+decides how many suggestions it shows and in what order, mixed with every other
+app's. Signing out withdraws them.
+
 ## Platform reality
 
 Worth knowing before judging the app for it:

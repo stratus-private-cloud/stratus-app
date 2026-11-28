@@ -41,8 +41,10 @@ class MusicLibraryTest : E2E() {
         launch()
         signIn()
         onTheBrowser()
-        runCatching { Stratus.folder("/Music/") }
-        Stratus.file("/Music/$unique.opus", instrumentation.context.assets.open("tagged.opus").readBytes())
+        // A folder of its own: one called Music in the shared tree would be what
+        // the sign-in test finds when it taps the Music section.
+        Stratus.folder("/$unique/")
+        Stratus.file("/$unique/track.opus", instrumentation.context.assets.open("tagged.opus").readBytes())
 
         val token = SessionToken(Phone.context, ComponentName(Phone.context, PlaybackService::class.java))
         val browser = onMain {
@@ -62,8 +64,9 @@ class MusicLibraryTest : E2E() {
             val artist = artists["Yellow Ostrich"] ?: fail("the artist never appeared: ${artists.keys}")
             val album = browser.titles(artist.mediaId)["Strange Land"] ?: fail("no album under the artist")
             assertTrue(album.mediaMetadata.isPlayable == true, "an album should play")
-            val track = browser.titles(album.mediaId).values.firstOrNull { "Stay At Home" in it.mediaMetadata.title.toString() }
-                ?: fail("no track in the album")
+            val tracks = browser.titles(album.mediaId)
+            val track = tracks.values.firstOrNull { "Stay At Home" in it.mediaMetadata.title.toString() }
+                ?: fail("no track in ${album.mediaId}: ${tracks.keys}")
 
             onMain {
                 browser.setMediaItem(MediaItem.Builder().setMediaId(track.mediaId).build())
@@ -78,7 +81,7 @@ class MusicLibraryTest : E2E() {
                 browser.stop()
                 browser.release()
             }
-            Stratus.remove("/Music/$unique.opus")
+            Stratus.remove("/$unique/")
         }
     }
 }

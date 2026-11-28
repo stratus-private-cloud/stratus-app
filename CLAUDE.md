@@ -906,6 +906,12 @@ no general filesystem to put it in.
 on the `ClipData`, which is what the chooser passes on. It is sharing for any
 server, where a link is sharing for a Stratus. On iOS all three are the one
 share sheet, because that is all the platform has.
+**And the two meet in the sheet** (stratus-app#268): on Android 14 a
+`ChooserAction` beside the apps copies a week's signed link, through
+`CopyLinkReceiver`. `Sharing.linkFor` asks the server while the file
+downloads, so the sheet waits for nothing new, and a file whose link would
+not open gets no button. The week is fixed because there is no dialog to
+choose it in, and the button says so.
 
 **"Which folders" does not survive the crossing to iOS.** Android has folders and
 `DCIM` is one of them. iOS has a photo library with albums, no directories, and

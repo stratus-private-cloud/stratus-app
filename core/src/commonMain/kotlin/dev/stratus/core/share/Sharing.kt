@@ -34,4 +34,15 @@ class Sharing(
         if (answer == LinkAnswer.Honoured) sheet.offer(link, target.name)
         return answer
     }
+
+    /**
+     * A link to put beside a file being sent, or null where it would not
+     * open. Signed by `source` where there is one, as a cast is, so a
+     * photograph sent from the timeline has one too.
+     */
+    suspend fun linkFor(target: DavResource, life: ShareLife): String? {
+        if (!offered) return null
+        val link = links.link(target.source ?: target.path, target.isDirectory, life, now()) ?: return null
+        return link.takeIf { support.honours(it) == LinkAnswer.Honoured }
+    }
 }

@@ -22,6 +22,10 @@ interface FileHandoff {
      * Sends the file itself to another app -- a chat, an email -- which is
      * the other half of sharing: a link needs a Stratus and somebody to open
      * it, and this needs neither.
+     *
+     * [link] is a signed link to the same file where there is one, offered
+     * beside it in the sheet (stratus-app#268); it is asked once the bytes
+     * are in, so its check runs while they download.
      */
-    suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit)
+    suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit, link: suspend () -> String?)
 }

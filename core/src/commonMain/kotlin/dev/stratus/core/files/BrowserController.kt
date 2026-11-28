@@ -13,6 +13,8 @@ import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -296,7 +298,13 @@ class BrowserController(
 
     fun saveFile(entry: DavResource) = transfer(entry) { name, type, body -> handoff.save(name, type, body) }
 
-    fun sendFile(entry: DavResource) = transfer(entry) { name, type, body -> handoff.send(name, type, body) }
+    fun sendFile(entry: DavResource) = transfer(entry) { name, type, body ->
+        coroutineScope {
+            val link = async { sharing?.linkFor(entry, ShareLife.AWeek) }
+            handoff.send(name, type, body) { link.await() }
+            link.cancel()
+        }
+    }
 
     /**
      * Opens [entry] in the app's own viewer, with the other pictures in

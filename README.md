@@ -407,7 +407,9 @@ and renaming a shared file breaks its link.
 the file is downloaded and handed to whatever takes one -- a chat, an email,
 Nearby Share -- through Android's share sheet or iOS's. It is the file and not
 a link, so the person at the other end needs nothing, and a large video is
-downloaded to the phone before it can go anywhere.
+downloaded to the phone before it can go anywhere. On Android 14 and later,
+where the file could be shared as a link, the sheet also has **Copy link ·
+1 week**, which puts a week's link to it on the clipboard.
 
 ## Calendars and contacts
 

@@ -39,7 +39,7 @@ class BrowserConformanceTest {
         override suspend fun save(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
             received += name
         }
-        override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit) {
+        override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit, link: suspend () -> String?) {
             received += name
         }
     }

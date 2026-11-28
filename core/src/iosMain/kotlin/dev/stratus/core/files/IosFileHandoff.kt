@@ -27,7 +27,7 @@ class IosFileHandoff : FileHandoff {
     override suspend fun save(name: String, contentType: String?, body: suspend (Sink) -> Unit) =
         present(name, body)
 
-    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit) =
+    override suspend fun send(name: String, contentType: String?, body: suspend (Sink) -> Unit, link: suspend () -> String?) =
         present(name, body)
 
     private suspend fun present(name: String, body: suspend (Sink) -> Unit) {

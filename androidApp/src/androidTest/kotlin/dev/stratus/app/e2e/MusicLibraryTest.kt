@@ -65,8 +65,8 @@ class MusicLibraryTest : E2E() {
             val album = browser.titles(artist.mediaId)["Strange Land"] ?: fail("no album under the artist")
             assertTrue(album.mediaMetadata.isPlayable == true, "an album should play")
             val tracks = browser.titles(album.mediaId)
-            val track = tracks.values.firstOrNull { "Stay At Home" in it.mediaMetadata.title.toString() }
-                ?: fail("no track in ${album.mediaId}: ${tracks.keys}")
+            // Named by the file, since the server names a track by what it was uploaded as.
+            val track = tracks["track"] ?: fail("no track in ${album.mediaId}: ${tracks.keys}")
 
             onMain {
                 browser.setMediaItem(MediaItem.Builder().setMediaId(track.mediaId).build())

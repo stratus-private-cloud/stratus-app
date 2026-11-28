@@ -115,6 +115,8 @@ dependencies {
     // app's own WebDAV client rather than a second one to keep in step.
     androidTestImplementation(libs.ktor.client.core)
     androidTestImplementation(libs.ktor.client.okhttp)
+    // To browse the music the way Android Auto does (stratus-app#267).
+    androidTestImplementation(libs.media3.session)
     // To wait for the backup pass a test asked for, not for a sentence about it.
     androidTestImplementation(libs.androidx.work)
     androidTestUtil(libs.androidx.test.orchestrator)

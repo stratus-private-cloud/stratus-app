@@ -474,6 +474,22 @@ Three surfaces, and no more than three:
    normal case. iOS is `AVPlayer` with a queue of our own, since
    `AVQueuePlayer` forgets a track once it has played; it cannot honour a pin.
 
+   **The Android service is a `MediaLibraryService`** (stratus-app#267),
+   because a library is what Android Auto, a watch and the Assistant read.
+   - **The tree is `MusicLibrary`, in common code.** Each node is a WebDAV
+     path: a folder opens and an audio file plays. On a Stratus the root is
+     `music/` and `playlists/`. Anywhere else it is the server's root, so a car
+     works against any server.
+   - **A car sends an id and nothing else.** `onSetMediaItems` turns it into
+     the same signed links a tap makes, and plays from it to the end of its
+     album. A track chosen inside a playlist plays that playlist, which is why
+     its id is `<playlist>#<index>`.
+   - **A voice request is a `searchQuery` on the item.** It is answered with
+     the server's `SEARCH`: what is found plays, or what is inside the first
+     folder found.
+   - **The app's own queue arrives with its links** and is played as it is, so
+     nothing the app does goes through the tree.
+
    **Photographs open in the app** (stratus-app#205), full screen and a
    swipe apart, and what is drawn is **the original** rather than the
    server's 1200-pixel JPEG: `/thumb/` is a Stratus's alone and the viewer

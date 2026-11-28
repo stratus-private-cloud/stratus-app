@@ -5,6 +5,7 @@ import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.util.Log
 
 /**
  * The recent folders as sharing shortcuts (stratus-app#269): the row of
@@ -23,6 +24,7 @@ object ShareTargets {
     fun folderOf(shortcutId: String?): String? = shortcutId?.takeIf { it.startsWith(PREFIX) }?.removePrefix(PREFIX)
 
     fun publish(context: Context, folders: List<String>) {
+        Log.i("Stratus", "share targets: $folders")
         if (Build.VERSION.SDK_INT < 33) return
         val manager = context.getSystemService(ShortcutManager::class.java) ?: return
         val ids = folders.map { PREFIX + it }
@@ -31,7 +33,8 @@ object ShareTargets {
             manager.removeLongLivedShortcuts(gone)
             manager.removeDynamicShortcuts(gone)
         }
-        val open = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        val open = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?: return Unit.also { Log.w("Stratus", "share targets: no launch intent") }
         folders.forEachIndexed { rank, folder ->
             manager.pushDynamicShortcut(
                 ShortcutInfo.Builder(context, PREFIX + folder)
@@ -46,5 +49,6 @@ object ShareTargets {
                     .build(),
             )
         }
+        Log.i("Stratus", "share targets now: ${manager.dynamicShortcuts.map { it.id }}")
     }
 }

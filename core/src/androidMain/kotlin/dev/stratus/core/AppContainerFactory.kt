@@ -1,6 +1,7 @@
 package dev.stratus.core
 
 import android.content.Context
+import android.util.Log
 import android.provider.DocumentsContract
 import dev.stratus.core.backup.AndroidAssetSource
 import dev.stratus.core.backup.AndroidPickedFiles
@@ -110,7 +111,10 @@ private fun build(application: Context): AppContainer {
         // Files keeps the storage locations a provider offers until something
         // tells it they moved, so a server added or removed would otherwise
         // not show up there until the next reboot (stratus-app#104).
-        foldersChanged = { folders -> runCatching { ShareTargets.publish(application, folders) } },
+        foldersChanged = { folders ->
+            runCatching { ShareTargets.publish(application, folders) }
+                .onFailure { Log.w("Stratus", "share targets not published", it) }
+        },
         serversChanged = {
             runCatching {
                 application.contentResolver.notifyChange(

@@ -97,7 +97,9 @@ class UploadTest : E2E() {
 
         val id = "folder:files/$unique"
         val shortcuts = context.getSystemService(ShortcutManager::class.java)
-        waitFor(15_000) { shortcuts.dynamicShortcuts.any { it.id == id } }
+        waitFor(15_000, { "shortcuts: ${shortcuts.dynamicShortcuts.map { it.id }}" }) {
+            shortcuts.dynamicShortcuts.any { it.id == id }
+        }
 
         val shared = pickable("note.txt", "shared into it")
         context.startActivity(
@@ -112,12 +114,12 @@ class UploadTest : E2E() {
         assertEquals("shared into it", Stratus.read("/$unique/note.txt"))
     }
 
-    private fun waitFor(timeoutMs: Long, condition: () -> Boolean) {
+    private fun waitFor(timeoutMs: Long, said: () -> String = { "The screen showed:\n${screen()}" }, condition: () -> Boolean) {
         val until = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < until) {
             if (runCatching(condition).getOrDefault(false)) return
             Thread.sleep(500)
         }
-        throw AssertionError("it never arrived. The screen showed:\n${screen()}")
+        throw AssertionError("it never arrived. ${said()}")
     }
 }
